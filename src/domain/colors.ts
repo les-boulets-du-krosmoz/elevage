@@ -4,8 +4,10 @@
  * - une bicolore « X et Y » s'obtient en croisant les monocolores X et Y.
  */
 export type Sex = 'M' | 'F';
+export type Espece = 'dragodinde' | 'volkorne' | 'muldo';
 
 export interface Color {
+  espece: Espece;
   name: string;
   gen: number;
   /** Monocolores qui composent la couleur (1 ou 2). */
@@ -52,11 +54,11 @@ const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').t
 const keyOf = (parts: string[]) => parts.map(norm).sort().join('|');
 
 export const COLORS: Color[] = [
-  ...Object.entries(MONO).map(([name, { gen }]): Color => ({ name, gen, parts: [name], recipe: MONO_RECIPE[name] ?? null })),
+  ...Object.entries(MONO).map(([name, { gen }]): Color => ({ espece: 'dragodinde', name, gen, parts: [name], recipe: MONO_RECIPE[name] ?? null })),
   ...Object.entries(BI).flatMap(([gen, names]) =>
     names.map((name): Color => {
       const parts = name.split(' et ') as [string, string];
-      return { name, gen: Number(gen), parts, recipe: parts };
+      return { espece: 'dragodinde', name, gen: Number(gen), parts, recipe: parts };
     }),
   ),
 ].sort((a, b) => a.gen - b.gen || a.name.localeCompare(b.name, 'fr'));
@@ -70,13 +72,14 @@ export function findColor(input: string | null | undefined): Color | null {
   return BY_KEY.get(keyOf(parts)) ?? null;
 }
 
-export const colorIndex = (c: Color) => COLORS.indexOf(c);
+export const colorIndex = (c: Color) => colorsOf(c.espece).indexOf(c);
 
 /** Fond CSS d'une pastille : plein pour une monocolore, moitié-moitié pour une bicolore. */
 export function swatchBackground(name: string): string | null {
-  const c = findColor(name);
-  if (!c) return null;
-  const [a, b] = c.parts.map((p) => MONO[p].hex);
+  if (!name) return null;
+  const hex = name.split(/\s+et\s+/).map((p) => HEX[norm(p)]);
+  if (!hex.length || hex.some((h) => !h)) return null;
+  const [a, b] = hex;
   return b ? `linear-gradient(90deg,${a} 50%,${b} 50%)` : a;
 }
 
@@ -107,3 +110,55 @@ export function treeColors(target: string): Set<string> {
 }
 
 export const sexSymbol = (x: Sex) => (x === 'M' ? '♂' : '♀');
+
+/* ---------- Volkornes et muldos ----------
+ * Données de jeu (couleurs et générations), d'après Dofus pour les Noobs, à vérifier dans l'interface Génétique.
+ * Règle commune aux trois espèces : chaque monocolore de génération impaire g se croise avec toutes les
+ * monocolores de génération ≤ g pour former les bicolores de la génération g + 1.
+ * Les croisements des monocolores (plusieurs possibles par couleur) arrivent avec le lot 7.
+ */
+const OTHER_MONOS: Record<Exclude<Espece, 'dragodinde'>, [string, number][]> = {
+  volkorne: [['Pourpre', 1], ['Orchidée', 1], ['Indigo', 1], ['Ebène', 1], ['Amande', 3], ['Roux', 3], ['Ivoire', 3], ['Turquoise', 3],
+    ['Prune', 5], ['Emeraude', 5], ['Doré', 7], ['Jade', 9], ['Rubis', 9], ['Saphir', 9], ['Améthyste', 9]],
+  muldo: [['Doré', 1], ['Pourpre', 1], ['Orchidée', 1], ['Indigo', 1], ['Ebène', 1], ['Roux', 3], ['Amande', 3], ['Ivoire', 5], ['Turquoise', 5],
+    ['Prune', 7], ['Emeraude', 7], ['Ambre', 9], ['Corail', 9], ['Azur', 9], ['Aigue-marine', 9]],
+};
+
+const HEX: Record<string, string> = Object.fromEntries(Object.entries({
+  ...Object.fromEntries(Object.entries(MONO).map(([n, v]) => [n, v.hex])),
+  Roux: '#B4532F', Doré: '#E0B33A', Jade: '#4FA36B', Rubis: '#B3123E', Saphir: '#1F4FB0', Améthyste: '#8B5FBF',
+  Ambre: '#D98E1F', Corail: '#F0775D', Azur: '#3FA9F5', 'Aigue-marine': '#6FD3C7',
+}).map(([n, h]) => [norm(n), h]));
+
+function buildSpecies(espece: Exclude<Espece, 'dragodinde'>): Color[] {
+  const monos = OTHER_MONOS[espece];
+  const out: Color[] = monos.map(([name, gen]) => ({ espece, name, gen, parts: [name], recipe: null }));
+  for (const [x, gx] of monos) {
+    if (gx % 2 === 0) continue;
+    for (const [y, gy] of monos) {
+      if (y === x || gy > gx || (gy === gx && monos.findIndex((m) => m[0] === y) < monos.findIndex((m) => m[0] === x))) continue;
+      out.push({ espece, name: `${x} et ${y}`, gen: gx + 1, parts: [x, y], recipe: [x, y] });
+    }
+  }
+  return out.sort((a, b) => a.gen - b.gen || out.indexOf(a) - out.indexOf(b));
+}
+
+export const SPECIES_COLORS: Record<Espece, Color[]> = {
+  dragodinde: COLORS,
+  volkorne: buildSpecies('volkorne'),
+  muldo: buildSpecies('muldo'),
+};
+const KEYS_BY_SPECIES: Record<Espece, Map<string, Color>> = Object.fromEntries(
+  Object.entries(SPECIES_COLORS).map(([e, list]) => [e, new Map(list.map((c) => [keyOf(c.parts), c]))]),
+) as Record<Espece, Map<string, Color>>;
+
+export const colorsOf = (espece: Espece) => SPECIES_COLORS[espece];
+
+/** Comme findColor, pour n'importe quelle espèce. */
+export function findColorIn(espece: Espece, input: string | null | undefined): Color | null {
+  if (!input) return null;
+  const parts = input.split(/\s+et\s+|\s*[/&+]\s*/i).filter(Boolean);
+  return KEYS_BY_SPECIES[espece].get(keyOf(parts)) ?? null;
+}
+
+export const SPECIES_LABEL: Record<Espece, string> = { dragodinde: 'Dragodindes', volkorne: 'Volkornes', muldo: 'Muldos' };

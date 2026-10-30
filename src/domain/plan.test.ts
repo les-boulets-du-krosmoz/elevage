@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { COLORS, findColor, treeWeights } from './colors';
 import { planCycle } from './plan';
-import { newDD } from './stock';
-import type { Dragodinde } from './types';
+import { newMonture } from './stock';
+import type { Monture } from './types';
 
 const herd = (spec: [string, 'M' | 'F', number][]) =>
-  spec.flatMap(([c, s, n]) => Array.from({ length: n }, () => newDD(c, s)));
+  spec.flatMap(([c, s, n]) => Array.from({ length: n }, () => newMonture(c, s)));
 const totalBuy = (b: Record<string, number>) => Object.values(b).reduce((a, v) => a + v, 0);
 
 describe('couleurs', () => {
@@ -34,7 +34,7 @@ describe('planCycle', () => {
     let seed = 42;
     const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % n; };
     for (let it = 0; it < 400; it++) {
-      const dd: Dragodinde[] = [];
+      const dd: Monture[] = [];
       for (const c of cols) for (const s of ['M', 'F'] as const) dd.push(...herd([[c, s, rnd(c.includes(' ') ? 3 : 6)]]));
       const target = targets[it % targets.length];
       const places = 2 * (1 + rnd(15));
@@ -43,7 +43,7 @@ describe('planCycle', () => {
         const before = totalBuy(plan.buy);
         const keys = Object.keys(plan.buy);
         const [c, s] = keys[rnd(keys.length)].split('|') as [string, 'M' | 'F'];
-        dd.push(newDD(c, s));
+        dd.push(newMonture(c, s));
         plan = planCycle(dd, target, places);
         expect(totalBuy(plan.buy)).toBe(before - 1);
       }

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { filesParents } from '../domain/destinations';
+import { marquerATester } from '../domain/conseils';
 import { findColor, type Sex } from '../domain/colors';
-import { bestParent, newDD } from '../domain/stock';
+import { bestParent, newMonture } from '../domain/stock';
 import { useEtable } from '../store/EtableContext';
-import { DDTag, SexMark, Swatch } from './ui';
+import { MountTag, SexMark, Swatch } from './ui';
 
 export interface BarTarget { m: string; f: string; child: string }
 
@@ -22,11 +24,13 @@ export function MiniBar({ m, f, child, onClose, onFlip, onOther }: Props) {
   const [repro, setRepro] = useState(false);
   const [babies, setBabies] = useState<(Baby | undefined)[]>([]);
   const [cur, setCur] = useState(0);
+  const [sexItem, setSexItem] = useState(false);
+  const [chanceItem, setChanceItem] = useState(false);
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus(), [m, f]);
   useEffect(() => { setBabies([]); setCur(0); }, [repro, m, f]);
 
-  const has = (c: string, x: Sex) => dd.some((d) => findColor(d.couleur)?.name === c && d.sexe === x);
+  const has = (c: string, x: Sex) => dd.some((d) => d.espece === 'dragodinde' && d.etat === 'feconde' && findColor(d.couleur)?.name === c && d.sexe === x);
   const ok = has(m, 'M') && has(f, 'F');
   const others = [...new Set([m, f])].filter((c) => c !== child);
 
@@ -35,10 +39,12 @@ export function MiniBar({ m, f, child, onClose, onFlip, onOther }: Props) {
     const pm = bestParent(dd, m, 'M', target);
     const pf = bestParent(dd, f, 'F', target);
     if (!pm || !pf) return;
-    const kids = list.map((b) => newDD(b.c, b.x, pm, pf));
-    act('accouplement', `♂ ${m} × ♀ ${f} → ${kids.map((k) => `${k.couleur} ${k.sexe === 'M' ? '♂' : '♀'}`).join(' + ')}`, {
-      add: kids, del: [pm, pf],
-      journal: { child, m, f, rc: list[0].c, rs: list[0].x, rc2: list[1]?.c ?? '', rs2: list[1]?.x ?? '' },
+    const kids = list.map((b) => newMonture(b.c, b.x, pm, pf));
+    const files = filesParents([pm, pf], settings.regles);
+    const noms = marquerATester('dragodinde', kids, m, f, dd);
+    act('accouplement', `♂ ${m} × ♀ ${f} → ${kids.map((k) => `${k.couleur} ${k.sexe === 'M' ? '♂' : '♀'}`).join(' + ')}${noms.length ? ` · à nommer en jeu : ${noms.join(', ')}` : ''}${files.resume ? ` · parents : ${files.resume}` : ''}`, {
+      add: kids, del: [pm, pf], queue: files.queue, extract: files.extract,
+      journal: { child, m, f, rc: list[0].c, rs: list[0].x, rc2: list[1]?.c ?? '', rs2: list[1]?.x ?? '', sexItem, chanceItem },
     });
     onClose();
   };
@@ -59,14 +65,14 @@ export function MiniBar({ m, f, child, onClose, onFlip, onOther }: Props) {
 
   return (
     <div className="mbar" role="group" aria-label="Résultat de l'accouplement" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <span className="ttl"><DDTag c={m} x="M" size={12} /> × <DDTag c={f} x="F" size={12} /></span>
+      <span className="ttl"><MountTag c={m} x="M" size={12} /> × <MountTag c={f} x="F" size={12} /></span>
       {onFlip && <button className="res alt" onClick={onFlip} title="Inverser les sexes des parents">⇄</button>}
       <button className="x" onClick={onClose} aria-label="Fermer">✕</button>
       {repro && (
         <div className="slots2">
           {[0, 1].map((i) => (
             <button key={i} className={`slot${cur === i ? ' on' : ''}`} onClick={() => setCur(i)}>
-              Bébé {i + 1} : {babies[i] ? <DDTag c={babies[i]!.c} x={babies[i]!.x} size={12} /> : <span className="muted">à choisir</span>}
+              Bébé {i + 1} : {babies[i] ? <MountTag c={babies[i]!.c} x={babies[i]!.x} size={12} /> : <span className="muted">à choisir</span>}
             </button>
           ))}
           <button className="res win" disabled={!babies[0] || !babies[1]} onClick={() => commit(babies as Baby[])}>Valider les 2 bébés</button>
@@ -79,10 +85,14 @@ export function MiniBar({ m, f, child, onClose, onFlip, onOther }: Props) {
           {others.length > 0 && <span className="sep">autre couleur :</span>}
           {others.flatMap((c) => [res(c, 'M'), res(c, 'F')])}
           <button className="res alt" onClick={onOther}>Autre…</button>
-          <label><input type="checkbox" checked={repro} onChange={(e) => setRepro(e.target.checked)} /> Parents reproducteurs (2 bébés)</label>
+          <span className="opts">
+            <label><input type="checkbox" checked={sexItem} onChange={(e) => setSexItem(e.target.checked)} /> Animakina utilisée (sexe choisi)</label>
+            <label><input type="checkbox" checked={chanceItem} onChange={(e) => setChanceItem(e.target.checked)} /> Optimakina utilisée (+20 %)</label>
+            <label><input type="checkbox" checked={repro} onChange={(e) => setRepro(e.target.checked)} /> Parents reproducteurs (2 bébés)</label>
+          </span>
         </>
       ) : (
-        <span className="ko">Il te manque {[!has(m, 'M') && `un ♂ ${m}`, !has(f, 'F') && `une ♀ ${f}`].filter(Boolean).join(' et ')} dans ton enclos.</span>
+        <span className="ko">Il te manque {[!has(m, 'M') && `un ♂ ${m}`, !has(f, 'F') && `une ♀ ${f}`].filter(Boolean).join(' et ')} féconde{!has(m, 'M') && !has(f, 'F') ? 's' : ''}.</span>
       )}
     </div>
   );

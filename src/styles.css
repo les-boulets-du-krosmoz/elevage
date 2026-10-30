@@ -42,7 +42,10 @@ table{border-collapse:collapse;width:100%;font-size:.95rem}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-weight:700;color:var(--muted);font-size:.85rem;cursor:pointer;user-select:none}
 tr:last-child td{border-bottom:0}
-.sex-M{color:#2F6FB0}.sex-F{color:#B0417A}
+:root{--male:#1F6FD1;--female:#D2337F}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--male:#6AA9FF;--female:#FF78B5}}
+:root[data-theme="dark"]{--male:#6AA9FF;--female:#FF78B5}
+.sex-M{color:var(--male);font-weight:700}.sex-F{color:var(--female);font-weight:700}
 .muted{color:var(--muted)}
 .neutral{display:inline-block;font-weight:700;font-size:1.3em;line-height:1;padding:0 .35em;margin:0 .15em;border-radius:6px;background:var(--line);color:var(--ink);vertical-align:-1px}
 .gridfit{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:16px;align-items:start}
@@ -109,3 +112,154 @@ tr.genrow td{background:var(--bg);font-weight:700;font-family:"Bricolage Grotesq
 tr.total td{font-weight:700;border-top:2px solid var(--ink)}
 td.num,th.num{text-align:center}
 .empty{padding:28px;text-align:center;color:var(--muted)}
+.mbar .opts{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px 16px}
+label.inline{flex-direction:row;align-items:center;gap:6px;font-weight:400;color:var(--ink)}
+.chip .itm{font-size:.75rem;color:var(--muted);margin-left:2px}
+.kpis{display:flex;flex-wrap:wrap;gap:12px 28px;margin:4px 0 12px}
+.kpis div{display:flex;flex-direction:column}
+.kpis b{font-family:"Bricolage Grotesque",sans-serif;font-size:1.6rem;line-height:1.1}
+.kpis span{color:var(--muted);font-size:.85rem}
+.fragile{display:inline-block;font-size:.78rem;font-weight:700;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:1px 8px;margin-left:6px;vertical-align:2px}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:11px;font-family:"Atkinson Hyperlegible",system-ui,sans-serif}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.85rem;margin-top:4px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
+.runegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-weight:700;border:0;background:var(--panel);color:var(--muted);padding:7px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--pine);color:var(--pine-ink)}
+
+/* Lot 1 : fécondité et zones de sérénité */
+.sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+button.promote{font:inherit;font-size:.75rem;font-weight:700;margin-top:4px;cursor:pointer;border:1px solid var(--ok);color:var(--ok);background:transparent;border-radius:99px;padding:1px 8px}
+button.promote:hover{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+button.zmm{color:#C0392B}.zm{color:#2E6FB5}.zp{color:#8E44AD}.zpp{color:#2E8B57}.zq{color:var(--muted)}
+.seg button.z[aria-pressed="true"]{color:#fff}
+.seg button.zmm[aria-pressed="true"]{background:#C0392B}.seg button.zm[aria-pressed="true"]{background:#2E6FB5}
+.seg button.zp[aria-pressed="true"]{background:#8E44AD}.seg button.zpp[aria-pressed="true"]{background:#2E8B57}
+.seg button.zq[aria-pressed="true"]{background:var(--muted)}
+.block-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:22px 0 10px}
+.block-title h2{font-size:1.45rem}
+.btn.zbuy{background:transparent;border:1px solid currentColor}
+button.btn.zbuy.zmm{color:#C0392B}button.btn.zbuy.zm{color:#2E6FB5}button.btn.zbuy.zp{color:#8E44AD}button.btn.zbuy.zpp{color:#2E8B57}
+.btn.zbuy:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
+
+/* Lot 2 : inventaire */
+table.inv td,table.inv th{padding:5px 8px}
+.invcell{width:64px;text-align:center;font:inherit;font-variant-numeric:tabular-nums;padding:4px 6px}
+.invcell.changed{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 30%,transparent);font-weight:700}
+.diffs{display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0}
+.btn:disabled{opacity:.45;cursor:default}
+.invcell.total{font-weight:700}
+tr.mismatch td{background:color-mix(in srgb,var(--warn) 8%,transparent)}
+
+/* Symboles de sexe en SVG : trait épais, couleur franche */
+svg.sexicon{display:inline-block;vertical-align:-.18em;fill:none;stroke:currentColor;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+th svg.sexicon.sex-M{color:var(--male)}th svg.sexicon.sex-F{color:var(--female)}
+
+/* Cartes d'enclos (calculateur) */
+.enclos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.enclos-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.enclos-head h3{font-size:1.15rem}
+.enclos-head .places{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums}
+.planline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 0;border-bottom:1px solid var(--line)}
+.planline:last-child{border-bottom:0}
+.planbtns{display:inline-flex;gap:6px;margin-left:auto}
+.warn-txt{color:var(--gold);font-weight:700}
+
+/* Calculateur d'enclos */
+.calc-card .enclos-head{margin-bottom:6px}
+.sims{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.sim{display:grid;grid-template-columns:7.5em auto 1fr auto;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.sim:first-child{border-top:0}
+.sim input{width:100%;padding:5px 8px;font-variant-numeric:tabular-nums}
+.sim input.bad{border-color:var(--warn)}
+.visages{display:inline-flex;gap:4px}
+.vis{border:2px solid transparent;border-radius:50%;background:none;padding:1px;cursor:pointer;line-height:0}
+.vis:disabled{cursor:default;opacity:.35}
+.vis[aria-pressed="true"]{border-color:var(--ink)}
+.vis:focus-visible{outline:2px solid var(--pine);outline-offset:2px}
+.visage circle:first-child{stroke:none}
+.visage.negatif circle:first-child{fill:#2E6FB5}
+.visage.positif circle:first-child{fill:#8E44AD}
+.visage .oeil{fill:#fff}
+.visage .bouche{fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round}
+.temps-sim{display:flex;flex-direction:column;line-height:1.25;font-variant-numeric:tabular-nums;min-width:0}
+.temps-sim b{font-size:1.15rem;font-family:"Bricolage Grotesque",sans-serif}
+.temps-sim .muted{font-size:.78rem}
+.sim .x{background:none;border:0;color:var(--muted);font-size:1.15rem;cursor:pointer;padding:2px 6px}
+.sim .x:disabled{opacity:.3;cursor:default}
+.outils{display:grid;gap:10px;margin-top:14px}
+.outil summary{cursor:pointer;font-weight:700}
+.palier-ctl{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.palier-ctl b{white-space:nowrap}
+.palier-ctl .seg{flex-shrink:0}
+
+/* Réglages */
+.regles{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.regle{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:6px 0;border-top:1px solid var(--line)}
+.regle:first-child{border-top:0}
+.regle select{padding:4px 6px}
+.regle .gens{display:inline-flex;align-items:center;gap:4px}
+.regle-btns{margin-left:auto;display:inline-flex}
+.regle .x,.recette .x{background:none;border:0;color:var(--muted);font-size:1.05rem;cursor:pointer;padding:2px 6px}
+.regle .x:disabled{opacity:.3;cursor:default}
+.recette{border-top:1px solid var(--line);padding:6px 0}
+.recette summary{cursor:pointer;display:flex;align-items:center;gap:6px}
+.recette ul{list-style:none;margin:6px 0 0;padding:0 0 0 22px;display:grid;gap:3px;font-size:.9rem}
+.recette input{min-width:180px}
+.badge{font-size:.72rem;font-weight:700;border:1px solid var(--gold);border-radius:99px;padding:0 7px;color:var(--ink)}
+.extraction{border-top:1px solid var(--line);padding:6px 0}
+.extraction:first-of-type{border-top:0}
+
+/* Plan par génération */
+.cibles{display:inline-flex;flex-wrap:wrap;gap:4px}
+.cible{font:inherit;font-size:.8rem;border:1px solid var(--line);border-radius:99px;padding:2px 9px;background:var(--bg);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.cible[aria-pressed="true"]{border-color:var(--pine);background:color-mix(in srgb,var(--pine) 14%,var(--panel));color:var(--ink);font-weight:700}
+.role{font-size:.75rem;font-weight:700;border-radius:99px;padding:1px 8px;border:1px solid currentColor;white-space:nowrap}
+.role.atteint{color:var(--ok)}
+.role.prepare{color:var(--pine)}
+.role.epuise{color:var(--muted)}
+.lot{align-items:flex-start}
+.valider{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.naissances{display:flex;flex-wrap:wrap;gap:6px 14px}
+.nais{display:inline-flex;align-items:center;gap:6px}
+.opti{font-size:.8rem;margin-top:2px}
+.badge .x{background:none;border:0;color:var(--muted);cursor:pointer;padding:0 2px}
+.retenir li{margin:4px 0}
+
+/* Brisage v2 */
+.runesearch{margin-top:10px}
+.runesearch input{width:100%;max-width:320px}
+.suggest{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.valeur{color:var(--ok);font-weight:600}
+.prixrune{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:700}
+
+/* Familiers */
+.familiers{list-style:none;margin:0;padding:0}
+.familiers li{border-top:1px solid var(--line);padding:8px 0;display:grid;gap:3px}
+.familiers li:first-child{border-top:0}
+.familiers li.choisi{background:color-mix(in srgb,var(--gold) 10%,transparent);border-radius:6px;padding:8px 6px}
+.fam-tete{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fam-bonus{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:.9rem}
+.fam-obt{font-size:.85rem}
+.badge.obt-offrande{border-color:var(--pine)}
+.badge.obt-quete{border-color:#8E44AD}
+.badge.obt-monnaie{border-color:var(--gold)}
+.repas{display:grid;gap:6px}
+.repas-ligne{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.repas-ligne .x{background:none;border:0;color:var(--muted);font-size:1.05rem;cursor:pointer}
+.perte{flex-basis:100%;font-size:.82rem;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.biblio{margin-top:6px}
+.biblio textarea{font:inherit;font-size:.85rem;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.repas-ligne{padding:6px 0;border-top:1px solid var(--line)}
+.repas-ligne:first-child{border-top:0}
+.fiab{flex-basis:100%;font-size:.82rem;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.fiab.alerte{color:var(--warn)}
+.averifier summary{cursor:pointer}
+.averifier ul{max-height:260px;overflow:auto;margin:0;padding-left:18px;font-size:.85rem}
+.mesres{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:10px;background:var(--bg)}
+.mesres .invcell{width:6.5em}
+.etoile{background:none;border:0;cursor:pointer;color:var(--gold);font-size:1.05rem;padding:0 4px;line-height:1}
+.etoile[aria-pressed="false"]{color:var(--muted)}

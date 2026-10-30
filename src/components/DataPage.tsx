@@ -5,7 +5,7 @@ import { parseBackup, toBackup } from '../store/storage';
 import { ConfirmButton } from './ui';
 
 export function DataPage() {
-  const { dd, history, settings, act, importData } = useEtable();
+  const { dd, history, settings, breaks, queue, extract, act, importData } = useEtable();
   const toast = useToast();
   const [mode, setMode] = useState<'fusion' | 'remplacement'>('fusion');
   const [text, setText] = useState('');
@@ -15,7 +15,7 @@ export function DataPage() {
     try { importData(parseBackup(raw), mode); } catch { toast.show('Fichier illisible : ce n’est pas une sauvegarde Étable'); }
   };
   const doExport = () => {
-    const url = URL.createObjectURL(new Blob([toBackup({ dd, history, settings })], { type: 'application/json' }));
+    const url = URL.createObjectURL(new Blob([toBackup({ dd, history, settings, breaks, queue, extract })], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `etable-dragodindes-${new Date().toISOString().slice(0, 10)}.json`;
@@ -29,22 +29,22 @@ export function DataPage() {
         Enregistré dans le cache de ce navigateur : {dd.length} DD. Vider le cache efface tout : exporte régulièrement.
       </p>
       <div>
-        <button className="btn ghost" onClick={doExport}>Exporter (DD, historique et réglages)</button>
+        <button className="btn ghost" onClick={doExport}>Exporter (DD, historique, brisages et réglages)</button>
       </div>
       <fieldset>
         <legend>Importer</legend>
         <div className="bar" style={{ margin: '4px 0 10px' }}>
           <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400, color: 'var(--ink)' }}>
-            <input type="radio" checked={mode === 'fusion'} onChange={() => setMode('fusion')} /> Ajouter à mon enclos
+            <input type="radio" checked={mode === 'fusion'} onChange={() => setMode('fusion')} /> Ajouter à mon étable
           </label>
           <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6, fontWeight: 400, color: 'var(--ink)' }}>
-            <input type="radio" checked={mode === 'remplacement'} onChange={() => setMode('remplacement')} /> Remplacer mon enclos
+            <input type="radio" checked={mode === 'remplacement'} onChange={() => setMode('remplacement')} /> Remplacer mon étable
           </label>
         </div>
         <p className="note" style={{ marginTop: 0 }}>
           {mode === 'fusion'
             ? 'Les DD déjà présentes (même identifiant) sont ignorées : réimporter le même fichier ne crée pas de doublons.'
-            : 'Ton enclos actuel est remplacé par celui du fichier. Annulable depuis l’historique.'}
+            : 'Ton étable actuelle est remplacée par celui du fichier. Annulable depuis l’historique.'}
         </p>
         <button className="btn ghost" onClick={() => file.current?.click()}>Choisir un fichier…</button>
         <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => {

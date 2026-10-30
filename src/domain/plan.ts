@@ -1,6 +1,6 @@
 import { COLORS, colorIndex, findColor, treeWeights, type Color, type Sex } from './colors';
 import { countStock, key } from './stock';
-import type { Dragodinde } from './types';
+import type { Monture } from './types';
 
 export interface Crossing {
   m: string;
@@ -29,7 +29,7 @@ export interface CyclePlan {
  *    Il n'existe que 3 bicolores de génération 2, donc la recherche reste rapide, et chaque
  *    DD achetée fait baisser le total d'achats d'exactement 1.
  */
-export function planCycle(dd: Dragodinde[], target: string, places: number): CyclePlan {
+export function planCycle(dd: Monture[], target: string, places: number): CyclePlan {
   const stock = countStock(dd);
   const st = (k: string) => stock[k] ?? 0;
   const color = (n: string) => findColor(n) as Color;
@@ -129,9 +129,9 @@ export interface NextGenRow {
   total: number;
 }
 
-/** Tous les croisements faisables avec le stock qui montent d'une génération (calcul ligne par ligne). */
-export function nextGeneration(dd: Dragodinde[]): NextGenRow[] {
-  const s = countStock(dd);
+/** Tous les croisements faisables avec les fécondes qui montent d'une génération (calcul ligne par ligne). */
+export function nextGeneration(dd: Monture[]): NextGenRow[] {
+  const s = countStock(dd.filter((d) => d.etat === 'feconde'));
   const n = (c: string, x: Sex) => s[key(c, x)] ?? 0;
   return COLORS.filter((c) => c.recipe)
     .map((c) => {
@@ -144,4 +144,59 @@ export function nextGeneration(dd: Dragodinde[]): NextGenRow[] {
     })
     .filter((r) => r.total > 0)
     .sort((x, y) => y.color.gen - x.color.gen || colorIndex(x.color) - colorIndex(y.color));
+}
+
+/**
+ * « À faire maintenant » : tous les croisements possibles vers la cible avec les seules fécondes, sans achat.
+ * Les recettes les plus hautes passent d'abord ; à génération égale, elles se partagent le stock
+ * à tour de rôle selon le ratio de l'arbre (2 Amande et Dorée pour 1 Dorée et Rousse, par exemple).
+ */
+export function planNow(dd: Monture[], target: string): Crossing[] {
+  const stock = countStock(dd.filter((d) => d.etat === 'feconde'));
+  const st = (k: string) => stock[k] ?? 0;
+  const weights = treeWeights(target);
+  const byGen = new Map<number, { child: string; k: number; recipe: [string, string] }[]>();
+  for (const [child, k] of weights) {
+    const c = findColor(child)!;
+    byGen.set(c.gen, [...(byGen.get(c.gen) ?? []), { child: c.name, k, recipe: c.recipe! }]);
+  }
+  const crossings: Crossing[] = [];
+  const push = (m: string, f: string, child: string) => {
+    const e = crossings.find((r) => r.m === m && r.f === f);
+    if (e) e.n++;
+    else crossings.push({ m, f, bm: 0, bf: 0, child, gen: findColor(child)!.gen, n: 1 });
+  };
+  for (const gen of [...byGen.keys()].sort((a, b) => b - a)) {
+    const types = byGen.get(gen)!;
+    let progress = true;
+    while (progress) {
+      progress = false;
+      for (const t of types) {
+        for (let i = 0; i < t.k; i++) {
+          const [a, b] = t.recipe;
+          const pick = ([[a, b], [b, a]] as [string, string][]).find(([m, f]) => st(key(m, 'M')) > 0 && st(key(f, 'F')) > 0);
+          if (!pick) break;
+          stock[key(pick[0], 'M')]--;
+          stock[key(pick[1], 'F')]--;
+          push(pick[0], pick[1], t.child);
+          progress = true;
+        }
+      }
+    }
+  }
+  return crossings.sort((x, y) => y.gen - x.gen);
+}
+
+/** Retire du stock les fécondes utilisées par des croisements (pour planifier la suite avec le reste). */
+export function withoutUsed(dd: Monture[], crossings: Crossing[]): Monture[] {
+  const need: Record<string, number> = {};
+  for (const c of crossings) {
+    need[key(c.m, 'M')] = (need[key(c.m, 'M')] ?? 0) + c.n;
+    need[key(c.f, 'F')] = (need[key(c.f, 'F')] ?? 0) + c.n;
+  }
+  return dd.filter((d) => {
+    const k = key(findColor(d.couleur)?.name ?? '', d.sexe);
+    if (d.etat === 'feconde' && need[k] > 0) { need[k]--; return false; }
+    return true;
+  });
 }

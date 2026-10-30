@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { filesParents } from '../domain/destinations';
+import { marquerATester } from '../domain/conseils';
 import { colorIndex, findColor, treeColors, type Sex } from '../domain/colors';
-import { ancestry, newDD, treeScore } from '../domain/stock';
+import { ancestry, newMonture, treeScore } from '../domain/stock';
 import { useEtable } from '../store/EtableContext';
+import { SexMark } from './ui';
 
 export interface MateRequest {
   m: string;
@@ -31,7 +34,7 @@ export function MateDialog({ req, onClose }: { req: MateRequest | null; onClose:
     return t ? treeColors(t.name) : new Set<string>();
   }, [settings.target]);
   const list = (x: Sex) =>
-    dd.filter((d) => d.sexe === x && findColor(d.couleur))
+    dd.filter((d) => d.espece === 'dragodinde' && d.etat === 'feconde' && d.sexe === x && findColor(d.couleur))
       .sort((a, b) => colorIndex(findColor(a.couleur)!) - colorIndex(findColor(b.couleur)!) || treeScore(b, useful) - treeScore(a, useful) || a.created - b.created);
   const pre = (x: Sex, c: string) => list(x).find((d) => findColor(d.couleur)?.name === c)?.id ?? '';
 
@@ -50,11 +53,13 @@ export function MateDialog({ req, onClose }: { req: MateRequest | null; onClose:
       babies.push({ c: c.name, x: F.get('s' + i) === 'F' ? 'F' : 'M' });
     }
     if (req?.journal && !babies.length) { setErr('Indique le résultat obtenu.'); return; }
-    const kids = babies.map((b) => newDD(b.c, b.x, pm, pf));
+    const kids = babies.map((b) => newMonture(b.c, b.x, pm, pf));
     const mc = findColor(pm.couleur)!.name, fc = findColor(pf.couleur)!.name;
-    act('accouplement', `♂ ${mc} × ♀ ${fc} → ${kids.length ? kids.map((k) => `${k.couleur} ${k.sexe === 'M' ? '♂' : '♀'}`).join(' + ') : 'aucun bébé noté'}`, {
-      add: kids, del: [pm, pf],
-      journal: req?.journal && babies[0] ? { child: req.child, m: mc, f: fc, rc: babies[0].c, rs: babies[0].x, rc2: babies[1]?.c ?? '', rs2: babies[1]?.x ?? '' } : null,
+    const files = filesParents([pm, pf], settings.regles);
+    const noms = marquerATester('dragodinde', kids, mc, fc, dd);
+    act('accouplement', `♂ ${mc} × ♀ ${fc} → ${kids.length ? kids.map((k) => `${k.couleur} ${k.sexe === 'M' ? '♂' : '♀'}`).join(' + ') : 'aucun bébé noté'}${noms.length ? ` · à nommer en jeu : ${noms.join(', ')}` : ''}${files.resume ? ` · parents : ${files.resume}` : ''}`, {
+      add: kids, del: [pm, pf], queue: files.queue, extract: files.extract,
+      journal: req?.journal && babies[0] ? { child: req.child, m: mc, f: fc, rc: babies[0].c, rs: babies[0].x, rc2: babies[1]?.c ?? '', rs2: babies[1]?.x ?? '', sexItem: F.get('sexItem') === 'on', chanceItem: F.get('chanceItem') === 'on' } : null,
     });
     onClose();
   };
@@ -70,11 +75,11 @@ export function MateDialog({ req, onClose }: { req: MateRequest | null; onClose:
       {req && (
         <form onSubmit={submit} key={`${req.m}|${req.f}|${req.child}`}>
           <h2>Accouplement{req.child ? ` : ${req.child}` : ''}</h2>
-          <p className="note">Les deux parents sont retirés de ton enclos. Le bébé garde la trace de ses parents et grands-parents. Les parents les mieux placés pour ta cible sont proposés en premier.</p>
+          <p className="note">Seules les fécondes sont proposées. Les deux parents sont retirés ; le bébé arrive fertile et garde la trace de ses parents et grands-parents. Les parents les mieux placés pour ta cible sont proposés en premier.</p>
           <div className="fields" style={{ gridTemplateColumns: '1fr' }}>
-            <label><span className="sex-M">♂ Père</span>
+            <label><span className="sex-M"><SexMark x="M" /> Père</span>
               <select name="pm" required defaultValue={pre('M', req.m)}><option value="">Choisir…</option>{opt('M')}</select></label>
-            <label><span className="sex-F">♀ Mère</span>
+            <label><span className="sex-F"><SexMark x="F" /> Mère</span>
               <select name="pf" required defaultValue={pre('F', req.f)}><option value="">Choisir…</option>{opt('F')}</select></label>
           </div>
           {[0, 1].map((i) => (
@@ -86,6 +91,12 @@ export function MateDialog({ req, onClose }: { req: MateRequest | null; onClose:
               </div>
             </fieldset>
           ))}
+          {req.journal && (
+            <div className="bar" style={{ margin: 0 }}>
+              <label className="inline"><input type="checkbox" name="sexItem" /> Animakina utilisée (sexe choisi)</label>
+              <label className="inline"><input type="checkbox" name="chanceItem" /> Optimakina utilisée (+20 %)</label>
+            </div>
+          )}
           <p className="ko" role="alert">{err}</p>
           <div className="actions">
             <button type="button" className="btn ghost" onClick={onClose}>Annuler</button>
