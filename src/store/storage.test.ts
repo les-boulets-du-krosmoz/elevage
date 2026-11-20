@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { parseBackup, toBackup } from './storage';
 
@@ -12,7 +13,7 @@ describe('import / export', () => {
     expect(r.dd![0]).not.toHaveProperty('zone');
   });
   it('fait l’aller-retour d’une sauvegarde complète', () => {
-    const state = { dd: [{ id: 'x', espece: 'dragodinde' as const, couleur: 'Ebène', sexe: 'M' as const, etat: 'feconde' as const, pere: '', mere: '', gp: ['', '', '', ''] as [string, string, string, string], created: 1 }], history: [], settings: { places: 12, nbEnclos: 1, sexItemPriceK: 10000, target: 'Pourpre', journal: [], vitesses: [10, 20, 30, 40], calc: { palier: 4 as const, simulations: {} }, regles: [], recettes: {}, cibles: {}, prix: { ressource: {}, runes: {}, optimakina: {}, geneton: null }, chanceBase: 40 }, breaks: [], queue: { volkorne: {}, muldo: {} }, extract: { dragodinde: {}, volkorne: {}, muldo: {} } };
+    const state = { dd: [{ id: 'x', espece: 'dragodinde' as const, couleur: 'Ébène', sexe: 'M' as const, etat: 'feconde' as const, pere: '', mere: '', gp: ['', '', '', ''] as [string, string, string, string], created: 1 }], history: [], settings: { places: 12, nbEnclos: 1, sexItemPriceK: 10000, target: 'Pourpre', journal: [], vitesses: [10, 20, 30, 40], calc: { palier: 4 as const, simulations: {} }, regles: [], recettes: {}, cibles: {}, prix: { ressource: {}, runes: {}, optimakina: {}, geneton: null }, chanceBase: 40 }, breaks: [], queue: { volkorne: {}, muldo: {} }, extract: { dragodinde: {}, volkorne: {}, muldo: {} } };
     const r = parseBackup(toBackup(state));
     expect(r.dd).toEqual(state.dd);
     expect(r.settings?.places).toBe(12);
@@ -81,5 +82,35 @@ describe('lot C : sauvegarde des règles, recettes et file à extraire', () => {
     expect(ressourcesExtraction(q, 'muldo')).toBe(2 * 3 + 2);
     q = applyExtract(q, [{ espece: 'muldo', couleur: 'Roux', delta: -5 }]);
     expect(q.muldo).toEqual({ 'Doré et Pourpre': 1 });
+  });
+});
+
+import { ecrireFamiliers, lireFamiliers, parseBackup as lireSauvegarde, toBackup as sauvegarde } from './storage';
+
+describe('sauvegarde des familiers', () => {
+  it('l’export emporte les données des familiers, l’import les restaure', () => {
+    localStorage.clear();
+    localStorage.setItem('familiers-favoris', JSON.stringify({ 'Rose des sables': { valeur: 5, le: 1 } }));
+    localStorage.setItem('familiers-ressources', JSON.stringify([{ nom: 'Rune Age', xp: 0.1, fiabilite: 'verifiee' }]));
+    const etat = { dd: [], history: [], settings: normalizeSettings({}), breaks: [], queue: { volkorne: {}, muldo: {} }, extract: { dragodinde: {}, volkorne: {}, muldo: {} } };
+    const lu = lireSauvegarde(sauvegarde(etat, lireFamiliers()));
+    expect(lu.familiers).toEqual({ 'familiers-favoris': { 'Rose des sables': { valeur: 5, le: 1 } }, 'familiers-ressources': [{ nom: 'Rune Age', xp: 0.1, fiabilite: 'verifiee' }] });
+    localStorage.clear();
+    ecrireFamiliers(lu.familiers!, 'remplacement');
+    expect(lireFamiliers()['familiers-favoris']).toEqual({ 'Rose des sables': { valeur: 5, le: 1 } });
+  });
+  it('en fusion, favoris additionnés et valeur vérifiée gardée', () => {
+    localStorage.clear();
+    localStorage.setItem('familiers-favoris', JSON.stringify({ Galet: {} }));
+    localStorage.setItem('familiers-ressources', JSON.stringify([{ nom: 'Rune Age', xp: 0.1, fiabilite: 'verifiee' }]));
+    ecrireFamiliers({
+      'familiers-favoris': { 'Rose des sables': { valeur: 5 } },
+      'familiers-ressources': [{ nom: 'rune age', xp: 0.09, fiabilite: 'peu-rentable' }, { nom: 'Ambre', xp: 1, fiabilite: 'verifiee' }],
+    }, 'fusion');
+    expect(Object.keys(lireFamiliers()['familiers-favoris'] as object).sort()).toEqual(['Galet', 'Rose des sables']);
+    const r = lireFamiliers()['familiers-ressources'] as { nom: string; xp: number }[];
+    expect(r.find((x) => x.nom.toLowerCase() === 'rune age')!.xp).toBe(0.1);
+    expect(r.some((x) => x.nom === 'Ambre')).toBe(true);
+    localStorage.clear();
   });
 });

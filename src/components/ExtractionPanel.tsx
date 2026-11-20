@@ -40,7 +40,7 @@ export function ExtractionPanel() {
             </div>
             <div className="diffs">
               {lignes.map((l) => (
-                <span key={l.c}><b>{l.n}</b> <Swatch name={l.c} size={14} /> {l.c} <span className="muted">G{l.gen}</span></span>
+                <span key={l.c}><b>{l.n}</b> <Swatch espece={e} name={l.c} size={14} /> {l.c} <span className="muted">G{l.gen}</span></span>
               ))}
             </div>
           </div>

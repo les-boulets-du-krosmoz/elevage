@@ -13,7 +13,7 @@ import type { BreakQueue, BreakSession, Calculateur, EtableState, ExtractDelta, 
 export const KEYS = { dd: 'etable-dd-v1', history: 'etable-dd-v1-hist', settings: 'etable-dd-v1-set', breaks: 'etable-dd-v1-brisage', queue: 'etable-dd-v1-file', extract: 'etable-dd-v1-extraction' } as const;
 
 export const ENCLOS_MAX = 6;
-export const defaultSettings = (): Settings => ({ places: 20, nbEnclos: ENCLOS_MAX, sexItemPriceK: 10000, target: 'Ebène et Indigo', journal: [], vitesses: [...VITESSES_DEFAUT], calc: { palier: PALIER_DEFAUT, simulations: {} }, regles: REGLES_DEFAUT.map((r) => ({ ...r })), recettes: {}, cibles: {}, prix: { ressource: { muldo: 20000, volkorne: 20000 }, runes: {}, optimakina: {}, geneton: null }, chanceBase: 40 });
+export const defaultSettings = (): Settings => ({ places: 20, nbEnclos: ENCLOS_MAX, sexItemPriceK: 10000, target: 'Ébène et Indigo', journal: [], vitesses: [...VITESSES_DEFAUT], calc: { palier: PALIER_DEFAUT, simulations: {} }, regles: REGLES_DEFAUT.map((r) => ({ ...r })), recettes: {}, cibles: {}, prix: { ressource: { muldo: 20000, volkorne: 20000 }, runes: {}, optimakina: {}, geneton: null }, chanceBase: 40 });
 
 const read = <T,>(k: string, fallback: T): T => {
   try {
@@ -157,6 +157,8 @@ export function normalizeSettings(x: Partial<Settings> | null | undefined): Sett
   return {
     ...defaultSettings(), ...rest, nbEnclos, places, vitesses, calc: sanitizeCalc(x?.calc),
     regles: Array.isArray(x?.regles) ? sanitizeRegles(x!.regles) : REGLES_DEFAUT.map((r) => ({ ...r })),
+    // Couleur visée écrite comme en jeu (« Ébène et Indigo »), sauvegardes antérieures comprises
+    target: findColorIn('dragodinde', typeof x?.target === 'string' ? x.target : '')?.name ?? (typeof x?.target === 'string' ? x.target : 'Ébène et Indigo'),
     recettes: sanitizeRecettes(x?.recettes),
     cibles: sanitizeCibles(x?.cibles),
     prix: sanitizePrix(x?.prix),
@@ -191,11 +193,46 @@ export function save(s: EtableState): boolean {
   }
 }
 
-/** Sauvegarde complète : DD, historique et réglages. */
-export const toBackup = (s: EtableState) => JSON.stringify({ format: 'etable-dd', version: 1, ...s }, null, 1);
+/** Données de la page Familiers, gardées dans le navigateur : simulateur, bibliothèque (ajouts et vérifications), favoris, tri. */
+export const CLES_FAMILIERS = ['familiers', 'familiers-ressources', 'familiers-favoris', 'familiers-tri', 'familiers-reference', 'familiers-favoris-defaut'] as const;
+export type DonneesFamiliers = Partial<Record<(typeof CLES_FAMILIERS)[number], unknown>>;
+
+export function lireFamiliers(): DonneesFamiliers {
+  const out: DonneesFamiliers = {};
+  for (const k of CLES_FAMILIERS) {
+    try { const v = localStorage.getItem(k); if (v) out[k] = JSON.parse(v); } catch { /* ignorée */ }
+  }
+  return out;
+}
+
+/**
+ * Restaure les données des familiers. En remplacement, elles écrasent celles du navigateur ; en fusion, les favoris
+ * et la bibliothèque s'additionnent (les valeurs vérifiées l'emportent) et le simulateur local est gardé.
+ */
+export function ecrireFamiliers(d: DonneesFamiliers, mode: 'fusion' | 'remplacement') {
+  const actuel = lireFamiliers();
+  const ecrire = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* cache plein */ } };
+  for (const k of CLES_FAMILIERS) {
+    if (d[k] === undefined) continue;
+    if (mode === 'remplacement' || actuel[k] === undefined) { ecrire(k, d[k]); continue; }
+    if (k === 'familiers-favoris' && typeof d[k] === 'object') ecrire(k, { ...(d[k] as object), ...(actuel[k] as object) });
+    if (k === 'familiers-ressources' && Array.isArray(d[k]) && Array.isArray(actuel[k])) {
+      const cle = (r: { nom: string }) => r.nom.toLowerCase();
+      const map = new Map((d[k] as { nom: string; fiabilite?: string }[]).map((r) => [cle(r), r]));
+      for (const r of actuel[k] as { nom: string; fiabilite?: string }[]) {
+        if (r.fiabilite === 'verifiee' || map.get(cle(r))?.fiabilite !== 'verifiee') map.set(cle(r), r);
+      }
+      ecrire(k, [...map.values()]);
+    }
+  }
+}
+
+/** Sauvegarde complète : montures, historique, réglages, brisages, files, et données des familiers. */
+export const toBackup = (s: EtableState, familiers: DonneesFamiliers = {}) =>
+  JSON.stringify({ format: 'etable-dd', version: 1, ...s, familiers }, null, 1);
 
 /** Accepte une sauvegarde complète ou un ancien export (tableau de DD). */
-export function parseBackup(text: string): Partial<EtableState> {
+export function parseBackup(text: string): Partial<EtableState> & { familiers?: DonneesFamiliers } {
   const data: unknown = JSON.parse(text);
   if (Array.isArray(data)) return { dd: data.map(sanitize).filter((d) => d !== null) };
   if (data && typeof data === 'object' && Array.isArray((data as EtableState).dd)) {
@@ -207,6 +244,9 @@ export function parseBackup(text: string): Partial<EtableState> {
       breaks: Array.isArray(o.breaks) ? sanitizeBreaks(o.breaks) : undefined,
       queue: o.queue ? sanitizeQueue(o.queue) : undefined,
       extract: o.extract ? sanitizeExtract(o.extract) : undefined,
+      familiers: (data as { familiers?: unknown }).familiers && typeof (data as { familiers?: unknown }).familiers === 'object'
+        ? Object.fromEntries(CLES_FAMILIERS.filter((k) => k in ((data as { familiers: object }).familiers)).map((k) => [k, ((data as { familiers: Record<string, unknown> }).familiers)[k]]))
+        : undefined,
     };
   }
   throw new Error('format inconnu');
@@ -254,7 +294,11 @@ export function sanitizeQueue(x: unknown): BreakQueue {
   if (!x || typeof x !== 'object') return q;
   for (const e of ['volkorne', 'muldo'] as const) {
     const src = (x as Record<string, unknown>)[e];
-    if (src && typeof src === 'object') for (const [c, n] of Object.entries(src)) if (Number(n) > 0) q[e][c] = Math.floor(Number(n));
+    // Noms ramenés à l'écriture officielle du jeu (sauvegardes antérieures)
+    if (src && typeof src === 'object') for (const [c, n] of Object.entries(src)) {
+      const nom = findColorIn(e, c)?.name ?? c;
+      if (Number(n) > 0) q[e][nom] = (q[e][nom] ?? 0) + Math.floor(Number(n));
+    }
   }
   return q;
 }

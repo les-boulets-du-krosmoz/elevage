@@ -85,7 +85,7 @@ describe('brisage et objets', () => {
     await addDD('Dorée', 'F', 4);
     await addDD('Rousse', 'M', 2);
     fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
-    fireEvent.change(screen.getByDisplayValue('Ebène et Indigo'), { target: { value: 'Ebène' } });
+    fireEvent.change(screen.getByDisplayValue('Ébène et Indigo'), { target: { value: 'Ébène' } });
     expect(screen.getByText('Sexes à demander (Animakina)')).toBeTruthy();
     expect(screen.getByText(/Animakinas? ≈/)).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Noter un accouplement' })[0]);
@@ -148,7 +148,7 @@ describe('lot 1 : fécondité et réserve', () => {
     await addDD('Amande', 'M', 2, 'Fertile');
     await addDD('Dorée', 'F', 2, 'Fertile');
     fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
-    fireEvent.change(screen.getByDisplayValue('Ebène et Indigo'), { target: { value: 'Amande et Dorée' } });
+    fireEvent.change(screen.getByDisplayValue('Ébène et Indigo'), { target: { value: 'Amande et Dorée' } });
     fireEvent.change(screen.getByLabelText('Places pour les couples'), { target: { value: '10' } });
     const now = screen.getByText('Croisements possibles').closest('.panel') as HTMLElement;
     expect(now.textContent).toContain('1×');
@@ -349,7 +349,7 @@ describe('lot D : plan d’accouplement par génération', () => {
     fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
     const type = (label: string, v: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: v } });
-    type('Doré ♂', '10'); type('Indigo ♂', '5'); type('Ebène ♂', '5'); type('Orchidée ♀', '10'); type('Pourpre ♀', '10');
+    type('Doré ♂', '10'); type('Indigo ♂', '5'); type('Ébène ♂', '5'); type('Orchidée ♀', '10'); type('Pourpre ♀', '10');
     fireEvent.click(screen.getByRole('button', { name: 'Valider l\'inventaire' }));
 
     fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
@@ -359,7 +359,7 @@ describe('lot D : plan d’accouplement par génération', () => {
     expect(within(visees).getByRole('button', { name: /Amande/ }).getAttribute('aria-pressed')).toBe('true');
     const plan = () => screen.getByRole('region', { name: 'Plan de la session' });
     expect(plan().textContent).toContain('Session : 20 couples');
-    for (const l of ['Doré × Orchidée', 'Doré × Pourpre', 'Indigo × Pourpre', 'Ebène × Orchidée']) {
+    for (const l of ['Doré × Orchidée', 'Doré × Pourpre', 'Indigo × Pourpre', 'Ébène × Orchidée']) {
       expect(within(plan()).getByRole('group', { name: `Lot ${l}` }).textContent).toMatch(/^5×/);
     }
 
@@ -521,7 +521,7 @@ describe('Familiers : ressources à vérifier', () => {
     fireEvent.change(screen.getByLabelText('XP par unité 1'), { target: { value: '0,5' } });
     fireEvent.click(within(screen.getByLabelText('Fiabilité 1')).getByRole('button', { name: '0,5 XP vérifiée en jeu' }));
     expect(screen.getByLabelText('Fiabilité 1').textContent).toContain('✓ XP vérifiée en jeu');
-    expect(resume()).toMatch(new RegExp(`À vérifier en jeu : ${avant - 1} sur .*1 déjà vérifiées`));
+    expect(resume()).toMatch(new RegExp(`À vérifier en jeu : ${avant - 1} sur .*12 déjà vérifiées`)); // les 11 relevés intégrés et celle-ci
     // Peu rentable : signalée sans alerte
     fireEvent.change(screen.getByLabelText('Ressource 1'), { target: { value: 'Rune Age' } });
     expect(screen.getByLabelText('Fiabilité 1').textContent).toMatch(/Peu rentable : la table donne 1 XP pour 11, soit 0,091 XP par unité/);
@@ -538,6 +538,7 @@ describe('Familiers : ressources à vérifier', () => {
 
 describe('Familiers : mes ressources', () => {
   it('favoris, valeur à l’unité, tri par rentabilité, prix ou gain d’XP, et « Utiliser »', () => {
+    localStorage.setItem('familiers-favoris-defaut', '1'); // navigateur qui a déjà reçu les favoris de départ, puis les a retirés
     render(<App />);
     fireEvent.click(screen.getByRole('tab', { name: 'Familiers' }));
     const table = () => screen.getByRole('table', { name: 'Comparaison des ressources' });
@@ -565,5 +566,202 @@ describe('Familiers : mes ressources', () => {
     expect(etoiles).toHaveLength(2); // dans le tableau et sur la ligne du simulateur
     fireEvent.click(etoiles[1]);
     expect(ordre()).toEqual(['Croquette enrichie']);
+  });
+});
+
+describe('Familiers : comparaison avec la croquette', () => {
+  it('écart du coût de l’XP avec la référence, autre référence, XP corrigée dans le tableau', () => {
+    localStorage.setItem('familiers-favoris-defaut', '1');
+    render(<App />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Familiers' }));
+    const table = () => screen.getByRole('table', { name: 'Comparaison des ressources' });
+    const ecart = (nom: string) => screen.getByLabelText(`Écart ${nom}`).textContent;
+    fireEvent.change(screen.getByLabelText('Ajouter une ressource aux favoris'), { target: { value: 'Aile de Sinistrofu' } });
+    fireEvent.click(screen.getByRole('button', { name: '★ Ajouter' }));
+    expect(screen.getByText(/Donne la valeur de la croquette pour comparer/)).toBeTruthy();
+    // Croquette à 4 000 (8 kamas par XP) ; Aile relevée à 16,8 XP, à 100 kamas : 5,95 kamas par XP
+    fireEvent.change(screen.getByLabelText('Valeur Croquette enrichie'), { target: { value: '4000' } });
+    fireEvent.change(screen.getByLabelText('Valeur Aile de Sinistrofu'), { target: { value: '100' } });
+    expect(within(table()).getByRole('columnheader', { name: 'Par rapport à la croquette' })).toBeTruthy();
+    expect(ecart('Croquette enrichie')).toBe('référence');
+    expect(ecart('Aile de Sinistrofu')).toBe('26 % moins cher');
+    expect((screen.getByLabelText('XP par unité Aile de Sinistrofu') as HTMLInputElement).value).toBe('16,8');
+    // Une XP tapée dans le tableau devient la valeur vérifiée
+    const xp = screen.getByLabelText('XP par unité Aile de Sinistrofu');
+    fireEvent.change(xp, { target: { value: '10' } });
+    fireEvent.blur(xp);
+    expect(ecart('Aile de Sinistrofu')).toBe('25 % plus cher');
+    // Comparer à l'Aile : la croquette devient 20 % moins chère
+    fireEvent.change(screen.getByLabelText('Ressource de référence'), { target: { value: 'Aile de Sinistrofu' } });
+    expect(ecart('Croquette enrichie')).toBe('20 % moins cher');
+    expect(ecart('Aile de Sinistrofu')).toBe('référence');
+  });
+});
+
+describe('Familiers : classement de rentabilité', () => {
+  const ouvrir = () => { render(<App />); fireEvent.click(screen.getByRole('tab', { name: 'Familiers' })); };
+  const ordre = () => within(screen.getByRole('table', { name: 'Comparaison des ressources' })).getAllByRole('row').slice(1).map((r) => r.getAttribute('aria-label'));
+  const txt = (l: string) => screen.getByLabelText(l).textContent;
+  it('premier passage : les relevés en jeu et leurs prix sont déjà là, classés avec leur coeff', () => {
+    ouvrir();
+    // Peau de Trithon : 3 400 / 111 = 30,6 kamas par XP ; croquette : 38 882 / 500 = 77,8
+    expect(ordre().slice(0, 2)).toEqual(['Peau de Trithon', 'Croquette enrichie']);
+    expect(ordre()).toHaveLength(12);
+    expect([txt('Rang Peau de Trithon'), txt('Coeff Peau de Trithon')]).toEqual(['1', '1,00']);
+    expect([txt('Rang Croquette enrichie'), txt('Coeff Croquette enrichie')]).toEqual(['2', '2,54']);
+    expect([txt('Rang Dent de Cuirboule'), txt('Coeff Dent de Cuirboule')]).toEqual(['—', '—']);
+    // Un prix saisi entre aussitôt dans le classement : 3 800 / 101 = 37,6, coeff 1,23
+    fireEvent.change(screen.getByLabelText('Valeur Dent de Cuirboule'), { target: { value: '3800' } });
+    expect(ordre().slice(0, 3)).toEqual(['Peau de Trithon', 'Dent de Cuirboule', 'Croquette enrichie']);
+    expect([txt('Rang Dent de Cuirboule'), txt('Coeff Dent de Cuirboule'), txt('Rang Croquette enrichie')]).toEqual(['2', '1,23', '3']);
+    // Une ressource retirée ne revient pas au rechargement
+    fireEvent.click(within(within(screen.getByRole('table', { name: 'Comparaison des ressources' })).getByRole('row', { name: 'Dent de Klémort' })).getByRole('button', { name: 'Retirer des favoris : Dent de Klémort' }));
+    cleanup();
+    ouvrir();
+    expect(ordre()).toHaveLength(11);
+    expect(ordre()).not.toContain('Dent de Klémort');
+  });
+  it('ne remplace pas une valeur déjà saisie', () => {
+    localStorage.setItem('familiers-favoris', JSON.stringify({ 'Croquette enrichie': { valeur: 40000 }, 'Rose des sables': { valeur: 12 } }));
+    ouvrir();
+    expect((screen.getByLabelText('Valeur Croquette enrichie') as HTMLInputElement).value).toBe('40000');
+    expect((screen.getByLabelText('Valeur Peau de Trithon') as HTMLInputElement).value).toBe('3400');
+    expect(ordre()).toContain('Rose des sables');
+  });
+});
+
+describe('Saisie et accouplement plus simples', () => {
+  it('images du jeu, grille réduite à mes couleurs, plan regroupé par mâle', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    // Sans stock, toutes les couleurs sont proposées, aux noms du jeu
+    expect(screen.getByLabelText('Ébène et Indigo ♂')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Doré ♂'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('Orchidée ♀'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Pourpre ♀'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Valider l\'inventaire' }));
+    // Rouverte, la grille ne montre que mes couleurs ; une recherche retrouve les autres
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    expect(screen.queryByLabelText('Ébène et Indigo ♂')).toBeNull();
+    expect(screen.getByLabelText('Doré ♂')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Chercher une couleur'), { target: { value: 'ebene et indigo' } });
+    expect(screen.getByLabelText('Ébène et Indigo ♂')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer l’inventaire' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Espèce' })).getByRole('button', { name: 'Muldos' }));
+    const dore = screen.getByRole('group', { name: 'Mâles Doré' });
+    expect(dore.textContent).toMatch(/4 mâles à sortir, avec 2 ♀ (Orchidée|Pourpre), 2 ♀ (Orchidée|Pourpre)/);
+    expect(dore.querySelector('img.mi')!.getAttribute('src')).toMatch(/^https:\/\/api\.dofusdu\.de\/dofus3\/v1\/img\/item\/\d+-64\.png$/);
+  });
+});
+
+describe('Dictée et mode session', () => {
+  const dire = (label: string, phrase: string) => {
+    const champ = screen.getByLabelText(`${label} : phrase`);
+    fireEvent.change(champ, { target: { value: phrase } });
+    fireEvent.keyDown(champ, { key: 'Enter' });
+  };
+
+  it('dicte l’inventaire, annule, valide ; les lettres mènent à une couleur', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    dire("Dictée de l'inventaire", 'Pourpre, 3 femelles');
+    dire("Dictée de l'inventaire", 'Doré, douze mâles, cinq femelles');
+    expect(screen.getByLabelText("Dictée de l'inventaire : retour").textContent).toContain('Doré : 12 ♂, 5 ♀');
+    expect((screen.getByLabelText('Doré total') as HTMLInputElement).value).toBe('17');
+    dire("Dictée de l'inventaire", 'annuler');
+    expect((screen.getByLabelText('Doré total') as HTMLInputElement).value).toBe('0');
+    dire("Dictée de l'inventaire", 'Doré total vingt femelles huit');
+    expect((screen.getByLabelText('Doré ♂') as HTMLInputElement).value).toBe('12');
+    // Clavier : « or » mène à l'Orchidée
+    const cellule = screen.getByLabelText('Doré ♂');
+    cellule.focus();
+    fireEvent.keyDown(cellule, { key: 'o' });
+    fireEvent.keyDown(document.activeElement!, { key: 'r' });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Orchidée total');
+    dire("Dictée de l'inventaire", 'valider');
+    expect(counts()).toContain('23fécondes');
+  });
+
+  it('mode session : un clic ou une phrase par accouplement, jumeau, puis validation avec la lignée', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    dire("Dictée de l'inventaire", 'Doré, 2 mâles');
+    dire("Dictée de l'inventaire", 'Pourpre, 2 femelles');
+    dire("Dictée de l'inventaire", 'valider');
+    fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Espèce' })).getByRole('button', { name: 'Muldos' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Affichage du plan' })).getByRole('button', { name: 'En jeu (compteurs)' }));
+    const carte = () => screen.getByRole('group', { name: 'Session Doré × Pourpre' });
+    expect(within(carte()).getByLabelText('Compteur').textContent).toBe('0/2');
+    fireEvent.click(within(carte()).getByRole('button', { name: 'Doré et Pourpre femelle' }));
+    expect(within(carte()).getByLabelText('Compteur').textContent).toBe('1/2');
+    dire('Dictée des accouplements', 'Doré mâle');
+    expect(screen.getByLabelText('Dictée des accouplements : retour').textContent).toContain('Doré × Pourpre : Doré ♂ · 2/2');
+    dire('Dictée des accouplements', 'jumeau Pourpre femelle');
+    expect(within(carte()).getByLabelText('Compteur').textContent).toBe('2/2');
+    fireEvent.click(within(carte()).getByRole('button', { name: 'Valider 2 accouplements' }));
+    expect(screen.getByRole('status').textContent).toMatch(/2 × Doré ♂ × Pourpre ♀ → 1 Doré et Pourpre, 1 Doré, 1 Pourpre · parents : 4 à briser/);
+    expect(counts()).toContain('3fertiles');
+  });
+});
+
+describe('Phrases types de la dictée', () => {
+  it('cachées par défaut, affichées quand elles servent, avec de vraies couleurs', () => {
+    // Micro simulé : la reconnaissance du navigateur n'existe pas dans les tests
+    class FausseReco { lang = ''; continuous = false; interimResults = false; onresult = null; onend = null; onerror = null; start() {} stop() {} }
+    (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition = FausseReco;
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    expect(screen.queryByLabelText("Dictée de l'inventaire : phrases types")).toBeNull();
+    const champ = screen.getByLabelText("Dictée de l'inventaire : phrase");
+    fireEvent.change(champ, { target: { value: 'il pleut' } });
+    fireEvent.keyDown(champ, { key: 'Enter' });
+    expect(screen.getByLabelText("Dictée de l'inventaire : phrases types").textContent).toMatch(/Dis : .*Doré, 12 mâles, 5 femelles.*annuler.*valider/);
+    fireEvent.change(champ, { target: { value: 'Doré, 2 mâles' } });
+    fireEvent.keyDown(champ, { key: 'Enter' });
+    fireEvent.change(champ, { target: { value: 'Pourpre, 2 femelles' } });
+    fireEvent.keyDown(champ, { key: 'Enter' });
+    fireEvent.change(champ, { target: { value: 'valider' } });
+    fireEvent.keyDown(champ, { key: 'Enter' });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Espèce' })).getByRole('button', { name: 'Muldos' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Affichage du plan' })).getByRole('button', { name: 'En jeu (compteurs)' }));
+    const carte = screen.getByRole('group', { name: 'Session Doré × Pourpre' });
+    fireEvent.click(carte);
+    expect(within(carte).queryByLabelText('Phrases pour ce couple')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '🎤 Dicter' }));
+    expect(within(screen.getByRole('group', { name: 'Session Doré × Pourpre' })).getByLabelText('Phrases pour ce couple').textContent)
+      .toMatch(/Doré et Pourpre femelle.*Doré mâle.*jumeau Pourpre femelle.*annuler/);
+    expect(screen.getByLabelText('Dictée des accouplements : phrases types').textContent).toContain('Doré et Pourpre femelle');
+    delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+  });
+});
+
+describe('Plan qui évolue pendant la session', () => {
+  it('les accouplements notés réduisent les autres lots quand ils prennent les mêmes parents', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /Muldos \(0\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Inventaire' }));
+    const champ = screen.getByLabelText("Dictée de l'inventaire : phrase");
+    for (const p of ['Doré, 5 mâles', 'Orchidée, 4 femelles', 'Pourpre, 2 femelles', 'valider']) {
+      fireEvent.change(champ, { target: { value: p } });
+      fireEvent.keyDown(champ, { key: 'Enter' });
+    }
+    fireEvent.click(screen.getByRole('tab', { name: 'Couples' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Espèce' })).getByRole('button', { name: 'Muldos' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Affichage du plan' })).getByRole('button', { name: 'En jeu (compteurs)' }));
+    const compteur = (n: string) => within(screen.getByRole('group', { name: `Session ${n}` })).getByLabelText('Compteur').textContent;
+    expect([compteur('Doré × Orchidée'), compteur('Doré × Pourpre')]).toEqual(['0/3', '0/2']);
+    // 4 Doré × Orchidée faits au lieu de 3 : il ne reste qu'un Doré pour les Pourpre
+    for (let i = 0; i < 4; i++) fireEvent.click(within(screen.getByRole('group', { name: 'Session Doré × Orchidée' })).getByRole('button', { name: 'Doré et Orchidée mâle' }));
+    expect([compteur('Doré × Orchidée'), compteur('Doré × Pourpre')]).toEqual(['4/4', '0/1']);
   });
 });

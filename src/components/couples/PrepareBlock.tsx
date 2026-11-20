@@ -21,7 +21,7 @@ export function PrepareBlock({ T, rest }: { T: Color; rest: Monture[] }) {
   const nbBuy = buy.reduce((s, [, n]) => s + n, 0);
   const used = plan ? plan.crossings.reduce((s, r) => s + r.n, 0) * 2 : 0;
   const side = (c: string, x: Sex, b: 0 | 1) => (
-    <><MountTag c={c} x={x} /> <span className={b ? 'ko' : 'muted'}>({b ? 'à acheter' : 'étable'})</span></>
+    <><MountTag espece="dragodinde" c={c} x={x} /> <span className={b ? 'ko' : 'muted'}>({b ? 'à acheter' : 'étable'})</span></>
   );
 
   return (
@@ -42,7 +42,7 @@ export function PrepareBlock({ T, rest }: { T: Color; rest: Monture[] }) {
               const [c, x] = k.split('|') as [string, Sex];
               return (
                 <div key={k} className="planline">
-                  <span style={{ fontSize: '1.05rem' }}><b>{n}</b> <Swatch name={c} size={16} /> <SexMark x={x} /> {c}</span>
+                  <span style={{ fontSize: '1.05rem' }}><b>{n}</b> <Swatch espece="dragodinde" name={c} size={16} /> <SexMark x={x} /> {c}</span>
                   <button className="btn small" style={{ marginLeft: 'auto' }}
                     onClick={() => act('achat', `1 ${c} ${sym(x)} achetée`, { add: [newMonture(c, x, undefined, undefined, { etat: 'fertile' })] })}>Acheté</button>
                 </div>
@@ -53,7 +53,7 @@ export function PrepareBlock({ T, rest }: { T: Color; rest: Monture[] }) {
             <h3 style={{ fontSize: '1.15rem' }}>Couples à préparer</h3>
             {plan.crossings.map((r) => (
               <div className="planline" key={`${r.m}|${r.f}|${r.bm}|${r.bf}`}>
-                <b>{r.n}×</b> {side(r.m, 'M', r.bm)} × {side(r.f, 'F', r.bf)} → <Swatch name={r.child} size={14} /> <b>{r.child}</b>
+                <b>{r.n}×</b> {side(r.m, 'M', r.bm)} × {side(r.f, 'F', r.bf)} → <Swatch espece="dragodinde" name={r.child} size={14} /> <b>{r.child}</b>
               </div>
             ))}
             <p className="note" style={{ marginBottom: 0 }}>{used}/{P} places. Chaque « Acheté » ajoute la monture à l'étable, fertile, et fait baisser les achats de 1.</p>

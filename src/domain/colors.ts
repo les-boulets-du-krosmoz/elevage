@@ -3,6 +3,8 @@
  * - une monocolore de génération impaire ≥ 3 s'obtient en croisant deux bicolores précises ;
  * - une bicolore « X et Y » s'obtient en croisant les monocolores X et Y.
  */
+import { MONTURES_OFFICIELLES } from './montures';
+
 export type Sex = 'M' | 'F';
 export type Espece = 'dragodinde' | 'volkorne' | 'muldo';
 
@@ -53,7 +55,7 @@ const BI: Record<number, string[]> = {
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const keyOf = (parts: string[]) => parts.map(norm).sort().join('|');
 
-export const COLORS: Color[] = [
+const COLORS_BRUT: Color[] = [
   ...Object.entries(MONO).map(([name, { gen }]): Color => ({ espece: 'dragodinde', name, gen, parts: [name], recipe: MONO_RECIPE[name] ?? null })),
   ...Object.entries(BI).flatMap(([gen, names]) =>
     names.map((name): Color => {
@@ -62,6 +64,25 @@ export const COLORS: Color[] = [
     }),
   ),
 ].sort((a, b) => a.gen - b.gen || a.name.localeCompare(b.name, 'fr'));
+
+/**
+ * Reprend les noms officiels du jeu (encyclopédie) : ordre des couleurs (« Ébène et Indigo ») et accents.
+ * Les recettes suivent le renommage ; une couleur absente de l'encyclopédie garde son nom.
+ */
+function officialiser(list: Color[], espece: Espece): Color[] {
+  const officiels = new Map(MONTURES_OFFICIELLES[espece].map(([n]) => [keyOf(n.split(/\s+et\s+/)), n]));
+  const renomme = new Map<string, string>();
+  const out = list.map((c) => {
+    const n = officiels.get(keyOf(c.parts));
+    if (!n || n === c.name) return c;
+    renomme.set(c.name, n);
+    return { ...c, name: n, parts: n.split(/\s+et\s+/) };
+  });
+  const nom = (x: string) => renomme.get(x) ?? x;
+  return out.map((c) => (c.recipe ? { ...c, recipe: [nom(c.recipe[0]), nom(c.recipe[1])] as [string, string] } : c));
+}
+
+export const COLORS: Color[] = officialiser(COLORS_BRUT, 'dragodinde');
 
 const BY_KEY = new Map(COLORS.map((c) => [keyOf(c.parts), c]));
 
@@ -145,8 +166,8 @@ function buildSpecies(espece: Exclude<Espece, 'dragodinde'>): Color[] {
 
 export const SPECIES_COLORS: Record<Espece, Color[]> = {
   dragodinde: COLORS,
-  volkorne: buildSpecies('volkorne'),
-  muldo: buildSpecies('muldo'),
+  volkorne: officialiser(buildSpecies('volkorne'), 'volkorne'),
+  muldo: officialiser(buildSpecies('muldo'), 'muldo'),
 };
 const KEYS_BY_SPECIES: Record<Espece, Map<string, Color>> = Object.fromEntries(
   Object.entries(SPECIES_COLORS).map(([e, list]) => [e, new Map(list.map((c) => [keyOf(c.parts), c]))]),

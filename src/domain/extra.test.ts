@@ -9,18 +9,18 @@ describe('planSexes', () => {
   it('impose des sexes opposés pour former les couples de génération 3', () => {
     const dd = [...Array.from({ length: 4 }, () => newMonture('Amande', 'M')), ...Array.from({ length: 4 }, () => newMonture('Dorée', 'F')),
       ...Array.from({ length: 2 }, () => newMonture('Rousse', 'M'))];
-    const plan = planCycle(dd, 'Ebène', 8);
-    const sp = planSexes(dd, plan.crossings, 'Ebène');
+    const plan = planCycle(dd, 'Ébène', 8);
+    const sp = planSexes(dd, plan.crossings, 'Ébène');
     expect(sp.babies['Amande et Dorée']).toBeGreaterThan(0);
     expect(sp.babies['Dorée et Rousse']).toBeGreaterThan(0);
-    // Chaque couple d'Ebène vient de deux bébés : 2 objets par couple
-    expect(sp.next['Ebène'].couples).toBe(Math.min(sp.babies['Amande et Dorée'], sp.babies['Dorée et Rousse']));
-    expect(sp.items).toBe(sp.next['Ebène'].couples * 2);
+    // Chaque couple d'Ébène vient de deux bébés : 2 objets par couple
+    expect(sp.next['Ébène'].couples).toBe(Math.min(sp.babies['Amande et Dorée'], sp.babies['Dorée et Rousse']));
+    expect(sp.items).toBe(sp.next['Ébène'].couples * 2);
   });
   it('utilise le stock existant avant les objets', () => {
     const dd = [newMonture('Dorée et Rousse', 'F'), ...Array.from({ length: 2 }, () => newMonture('Amande', 'M')), ...Array.from({ length: 2 }, () => newMonture('Dorée', 'F'))];
-    const plan = planCycle(dd, 'Ebène', 2);
-    const sp = planSexes(dd, plan.crossings, 'Ebène');
+    const plan = planCycle(dd, 'Ébène', 2);
+    const sp = planSexes(dd, plan.crossings, 'Ébène');
     // Le bébé Amande et Dorée doit être ♂ pour aller avec la Dorée et Rousse ♀ du stock : 1 seul objet
     expect(sp.forced['Amande et Dorée']).toEqual({ M: 1, F: 0 });
     expect(sp.items).toBe(1);
@@ -65,7 +65,7 @@ describe('lot 1 : fécondité', () => {
 
   it('respecte le ratio de l’arbre entre recettes de même génération', () => {
     const dd = [...f('Amande', 'M', 6), ...f('Dorée', 'M', 6), ...f('Rousse', 'M', 6), ...f('Amande', 'F', 6), ...f('Dorée', 'F', 6), ...f('Rousse', 'F', 6)];
-    const now = planNow(dd, 'Ebène et Indigo');
+    const now = planNow(dd, 'Ébène et Indigo');
     const n = (child: string) => now.filter((c) => c.child === child).reduce((s, c) => s + c.n, 0);
     expect(n('Amande et Dorée')).toBeGreaterThanOrEqual(n('Dorée et Rousse'));
     expect(n('Amande et Dorée')).toBeGreaterThanOrEqual(n('Amande et Rousse'));

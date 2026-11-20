@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { colorsOf, findColorIn, SPECIES_LABEL, type Sex } from '../../domain/colors';
 import { conseilsSexe, marquerATester, nomsJeu, verdictOptimakina } from '../../domain/conseils';
 import { filesParents } from '../../domain/destinations';
-import { ciblesAuto, naissancesPossibles, planGeneration, type LotPlan } from '../../domain/planGeneration';
+import { ciblesAuto, naissancesPossibles, planAvecSession, type LotPlan } from '../../domain/planGeneration';
 import { recettes } from '../../domain/recettes';
 import { newMonture } from '../../domain/stock';
 import type { Monture } from '../../domain/types';
@@ -10,6 +10,8 @@ import { useEtable } from '../../store/EtableContext';
 import { fmtK } from './format';
 import { colorListId, MountTag, SexMark, Swatch } from '../ui';
 import { ARetenir } from './ARetenir';
+import { Session, SESSION_VIDE, type EtatSession } from './Session';
+import { readPref, writePref } from '../../store/prefs';
 
 type Esp = 'muldo' | 'volkorne';
 const sym = (x: Sex) => (x === 'M' ? '♂' : '♀');
@@ -24,10 +26,17 @@ export function PlanGenerationBlock({ espece }: { espece: Esp }) {
   const auto = useMemo(() => ciblesAuto(espece, dd), [espece, dd]);
   const cibles = settings.cibles[espece] ?? auto;
   const rec = useMemo(() => recettes(espece, settings.recettes), [espece, settings.recettes]);
-  const plan = useMemo(() => planGeneration(espece, dd, rec, cibles), [espece, dd, rec, cibles]);
+  // Accouplements notés en jeu, pas encore validés : ils réservent leurs parents et le reste du plan s'adapte
+  const cleSession = `session-${espece}`;
+  const [sessionEtat, setSessionEtatState] = useState<EtatSession>(() => readPref<EtatSession>(cleSession, SESSION_VIDE));
+  const setSessionEtat = (n: EtatSession) => { setSessionEtatState(n); writePref(cleSession, n); };
+  const notes = useMemo(() => Object.fromEntries(Object.entries(sessionEtat.faits).map(([k, v]) => [k, v.length])), [sessionEtat]);
+  const plan = useMemo(() => planAvecSession(espece, dd, rec, cibles, notes), [espece, dd, rec, cibles, notes]);
   const monos = colorsOf(espece).filter((c) => c.parts.length === 1 && c.gen >= 3);
   const fec = dd.filter((d) => d.espece === espece && d.etat === 'feconde').length;
   const couples = plan.lots.reduce((s, l) => s + l.n, 0);
+  const [session, setSessionState] = useState(() => readPref<boolean>('mode-session', false));
+  const setSession = (v: boolean) => { setSessionState(v); writePref('mode-session', v); };
   const conseils = useMemo(() => conseilsSexe(espece, dd, plan.lots, rec, cibles, settings.chanceBase), [espece, dd, plan, rec, cibles, settings.chanceBase]);
 
   const setCibles = (list: string[] | null) => {
@@ -45,7 +54,7 @@ export function PlanGenerationBlock({ espece }: { espece: Esp }) {
           <span className="cibles" role="group" aria-label="Monocolores visées">
             {monos.map((c) => (
               <button key={c.name} className="cible" aria-pressed={cibles.includes(c.name)} onClick={() => toggle(c.name)} title={`Génération ${c.gen}`}>
-                <Swatch name={c.name} size={12} /> {c.name} <span className="muted">G{c.gen}</span>
+                <Swatch espece={espece} name={c.name} size={12} /> {c.name} <span className="muted">G{c.gen}</span>
               </button>
             ))}
           </span>
@@ -62,8 +71,8 @@ export function PlanGenerationBlock({ espece }: { espece: Esp }) {
           <h3 style={{ fontSize: '1.05rem', marginBottom: 6 }}>Sexes à cibler (Animakina)</h3>
           {conseils.map((c) => (
             <p key={`${c.lot.m}|${c.lot.f}|${c.sexe}`} style={{ margin: '4px 0' }}>
-              <b>Animakina <SexMark x={c.sexe} /></b> sur <b>{c.accouplements}</b> accouplement{c.accouplements > 1 ? 's' : ''} <MountTag c={c.lot.m} x="M" /> × <MountTag c={c.lot.f} x="F" />
-              <span className="muted"> : {c.attente.n} <MountTag c={c.attente.c} x={c.attente.x} /> attendent des {c.sexe === 'F' ? 'femelles' : 'mâles'} {c.lot.bebe} pour faire du {c.pour}.</span>
+              <b>Animakina <SexMark x={c.sexe} /></b> sur <b>{c.accouplements}</b> accouplement{c.accouplements > 1 ? 's' : ''} <MountTag espece={espece} c={c.lot.m} x="M" /> × <MountTag espece={espece} c={c.lot.f} x="F" />
+              <span className="muted"> : {c.attente.n} <MountTag espece={espece} c={c.attente.c} x={c.attente.x} /> attendent des {c.sexe === 'F' ? 'femelles' : 'mâles'} {c.lot.bebe} pour faire du {c.pour}.</span>
             </p>
           ))}
           <p className="note" style={{ marginBottom: 0 }}>Une seule makina par accouplement : chaque Animakina remplace une Optimakina sur ce couple. Le nombre tient compte de la chance de réussite ({settings.chanceBase} %).</p>
@@ -72,15 +81,36 @@ export function PlanGenerationBlock({ espece }: { espece: Esp }) {
 
       {!fec ? <p className="panel muted">Aucune {SPECIES_LABEL[espece].toLowerCase().slice(0, -1)} féconde : saisis-les avec l'inventaire de Mon étable.</p> : (
         <div className="panel" role="region" aria-label="Plan de la session">
-          <h3 style={{ fontSize: '1.15rem' }}>
-            Session : {couples} couple{couples > 1 ? 's' : ''} <span className="muted" style={{ fontWeight: 400 }}>· {couples * 2} fécondes sur {fec}</span>
-          </h3>
-          {plan.lots.map((l) => <LigneLot key={`${l.m}|${l.f}`} espece={espece} lot={l} />)}
+          <div className="bar" style={{ margin: '0 0 6px', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '1.15rem' }}>
+              Session : {couples} couple{couples > 1 ? 's' : ''} <span className="muted" style={{ fontWeight: 400 }}>· {couples * 2} fécondes sur {fec}</span>
+            </h3>
+            <span style={{ flex: 1 }} />
+            <span className="seg" role="group" aria-label="Affichage du plan">
+              <button aria-pressed={!session} onClick={() => setSession(false)}>Plan</button>
+              <button aria-pressed={session} onClick={() => setSession(true)}>En jeu (compteurs)</button>
+            </span>
+          </div>
+          {session && <Session espece={espece} lots={plan.lots} etat={sessionEtat} setEtat={setSessionEtat} />}
+          {/* Regroupés par couleur du mâle : en jeu, un seul filtre de race à la fois (les filtres s'additionnent en « ET ») */}
+          {!session && [...new Set(plan.lots.map((l) => l.m))].map((m) => {
+            const lots = plan.lots.filter((l) => l.m === m);
+            const total = lots.reduce((s, l) => s + l.n, 0);
+            return (
+              <div key={m} className="groupe-male" role="group" aria-label={`Mâles ${m}`}>
+                <div className="groupe-tete">
+                  <Swatch espece={espece} name={m} size={16} /> <SexMark x="M" /> <b>{m}</b>
+                  <span className="muted"> : {total} mâle{total > 1 ? 's' : ''} à sortir, avec {lots.map((l) => `${l.n} ♀ ${l.f}`).join(', ')}</span>
+                </div>
+                {lots.map((l) => <LigneLot key={`${l.m}|${l.f}`} espece={espece} lot={l} />)}
+              </div>
+            );
+          })}
           {!plan.lots.length && <p className="muted">Aucun croisement utile avec les fécondes actuelles.</p>}
           {plan.restes.length > 0 && (
             <p className="note" style={{ marginBottom: 0 }}>
               Reste, faute de partenaire de l'autre sexe ou de couleur complémentaire :{' '}
-              {plan.restes.map((r, i) => <span key={`${r.c}|${r.x}`}>{i ? ', ' : ''}<b>{r.n}</b> <MountTag c={r.c} x={r.x} /></span>)}
+              {plan.restes.map((r, i) => <span key={`${r.c}|${r.x}`}>{i ? ', ' : ''}<b>{r.n}</b> <MountTag espece={espece} c={r.c} x={r.x} /></span>)}
             </p>
           )}
         </div>
@@ -158,7 +188,7 @@ function LigneLot({ espece, lot }: { espece: Esp; lot: LotPlan }) {
   return (
     <div className="planline lot" aria-label={`Lot ${lot.m} × ${lot.f}`} role="group">
       <div>
-        <b>{lot.n}×</b> <MountTag c={lot.m} x="M" /> × <MountTag c={lot.f} x="F" /> → <Swatch name={lot.bebe} size={14} /> <b>{lot.bebe}</b>{' '}
+        <b>{lot.n}×</b> <MountTag espece={espece} c={lot.m} x="M" /> × <MountTag espece={espece} c={lot.f} x="F" /> → <Swatch espece={espece} name={lot.bebe} size={14} /> <b>{lot.bebe}</b>{' '}
         <span className="muted">G{lot.gen}</span>{' '}
         <span className={`role ${lot.role}`}>{lot.role === 'prepare' && lot.pour ? `prépare ${lot.pour}` : ROLE[lot.role]}</span>
         {repros.length > 0 && (
@@ -185,7 +215,7 @@ function LigneLot({ espece, lot }: { espece: Esp; lot: LotPlan }) {
           </div>
           <div className="naissances">
             {couleurs.map((c) => (
-              <span key={c} className="nais"><Swatch name={c} size={12} /> {c} {champ(c, 'M')} {champ(c, 'F')}</span>
+              <span key={c} className="nais"><Swatch espece={espece} name={c} size={12} /> {c} {champ(c, 'M')} {champ(c, 'F')}</span>
             ))}
             <span className="nais">
               <input list={colorListId(espece)} placeholder="Autre couleur" aria-label="Autre couleur" style={{ width: '11em' }} value={autre} onChange={(e) => setAutre(e.target.value)} />

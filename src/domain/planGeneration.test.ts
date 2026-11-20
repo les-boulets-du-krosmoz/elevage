@@ -12,12 +12,12 @@ const R = recettes('muldo');
 const lotsDe = (p: ReturnType<typeof planGeneration>) => Object.fromEntries(p.lots.map((l) => [`${l.m} × ${l.f}`, l.n]));
 
 describe('lot D : plan d’accouplement par génération', () => {
-  it('critère du cahier : Roux et Amande, 10 Doré ♂, 5 Indigo ♂, 5 Ebène ♂, 10 Orchidée ♀, 10 Pourpre ♀', () => {
-    const dd = [...mk('Doré', 'M', 10), ...mk('Indigo', 'M', 5), ...mk('Ebène', 'M', 5), ...mk('Orchidée', 'F', 10), ...mk('Pourpre', 'F', 10)];
+  it('critère du cahier : Roux et Amande, 10 Doré ♂, 5 Indigo ♂, 5 Ébène ♂, 10 Orchidée ♀, 10 Pourpre ♀', () => {
+    const dd = [...mk('Doré', 'M', 10), ...mk('Indigo', 'M', 5), ...mk('Ébène', 'M', 5), ...mk('Orchidée', 'F', 10), ...mk('Pourpre', 'F', 10)];
     const cibles = ciblesAuto('muldo', dd);
     expect(cibles.sort()).toEqual(['Amande', 'Roux']);
     const p = planGeneration('muldo', dd, R, cibles);
-    expect(lotsDe(p)).toEqual({ 'Doré × Orchidée': 5, 'Doré × Pourpre': 5, 'Indigo × Pourpre': 5, 'Ebène × Orchidée': 5 });
+    expect(lotsDe(p)).toEqual({ 'Doré × Orchidée': 5, 'Doré × Pourpre': 5, 'Indigo × Pourpre': 5, 'Ébène × Orchidée': 5 });
     expect(p.restes).toEqual([]);
     expect(p.lots.every((l) => l.role === 'prepare')).toBe(true);
   });
@@ -37,11 +37,11 @@ describe('lot D : plan d’accouplement par génération', () => {
   });
 
   it('préfère une moitié de recette visée, puis épuise le stock avec d’autres bicolores, et liste le reste', () => {
-    const p = planGeneration('muldo', [...mk('Indigo', 'M', 3), ...mk('Ebène', 'F', 2), ...mk('Doré', 'M', 2)], R, ['Roux']);
-    expect(p.lots).toEqual([expect.objectContaining({ m: 'Doré', f: 'Ebène', n: 2, role: 'prepare', pour: 'Roux' })]);
+    const p = planGeneration('muldo', [...mk('Indigo', 'M', 3), ...mk('Ébène', 'F', 2), ...mk('Doré', 'M', 2)], R, ['Roux']);
+    expect(p.lots).toEqual([expect.objectContaining({ m: 'Doré', f: 'Ébène', n: 2, role: 'prepare', pour: 'Roux' })]);
     expect(p.restes).toEqual([{ c: 'Indigo', x: 'M', n: 3 }]);
-    const q = planGeneration('muldo', [...mk('Indigo', 'M', 2), ...mk('Ebène', 'F', 2)], R, ['Roux']);
-    expect(q.lots).toEqual([expect.objectContaining({ m: 'Indigo', f: 'Ebène', n: 2, role: 'epuise' })]);
+    const q = planGeneration('muldo', [...mk('Indigo', 'M', 2), ...mk('Ébène', 'F', 2)], R, ['Roux']);
+    expect(q.lots).toEqual([expect.objectContaining({ m: 'Indigo', f: 'Ébène', n: 2, role: 'epuise' })]);
   });
 
   it('une première monocolore de génération 3 ajoute la génération 5 aux cibles, sans retirer la 3', () => {
@@ -52,5 +52,25 @@ describe('lot D : plan d’accouplement par génération', () => {
     const p = planGeneration('muldo', [...mk('Doré', 'M', 15), ...mk('Pourpre', 'M', 4)], R, ['Roux']);
     expect(p.lots).toEqual([]);
     expect(p.restes).toEqual([{ c: 'Doré', x: 'M', n: 15 }, { c: 'Pourpre', x: 'M', n: 4 }]);
+  });
+});
+
+import { planAvecSession } from './planGeneration';
+
+describe('plan qui évolue avec la session', () => {
+  it('les accouplements notés réservent leurs parents ; le reste se replanifie', () => {
+    const dd = [...mk('Doré', 'M', 10), ...mk('Orchidée', 'F', 5), ...mk('Pourpre', 'F', 5)];
+    // 3 Doré × Orchidée déjà notés : il reste de quoi en faire 2, et toujours 5 Doré × Pourpre
+    const p = planAvecSession('muldo', dd, R, ['Roux'], { 'Doré|Orchidée': 3 });
+    expect(lotsDe(p)).toEqual({ 'Doré × Orchidée': 5, 'Doré × Pourpre': 5 });
+    // 7 Doré × Orchidée notés au lieu de 5 : les Doré restants s'ajustent
+    const q = planAvecSession('muldo', [...dd, ...mk('Orchidée', 'F', 2)], R, ['Roux'], { 'Doré|Orchidée': 7 });
+    expect(lotsDe(q)).toEqual({ 'Doré × Orchidée': 7, 'Doré × Pourpre': 3 });
+  });
+  it('un couple noté reste affiché même s’il n’est plus dans le plan', () => {
+    const dd = [...mk('Doré', 'M', 2), ...mk('Pourpre', 'F', 2)];
+    const p = planAvecSession('muldo', dd, R, ['Roux'], { 'Indigo|Orchidée': 2 });
+    expect(p.lots.find((l) => l.m === 'Indigo')).toMatchObject({ f: 'Orchidée', n: 2, bebe: n('Indigo et Orchidée') });
+    expect(lotsDe(p)['Doré × Pourpre']).toBe(2);
   });
 });

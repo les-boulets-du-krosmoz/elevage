@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
-  aVerifier, comparer, fourchette, fusionner, lireTable, NIVEAU_MAX, trierFavoris, verifier, type Favori, type TriFavoris, NIVEAU_PALIER, OBTENTION_LABEL, pasSansPerte, perteArrondi, quantitePour, quantiteSansPerte, simuler,
+  aVerifier, classement, comparer, ecartReference, fourchette, fusionner, texteEcart, lireTable, NIVEAU_MAX, trierFavoris, verifier, type Favori, type Rang, type TriFavoris, NIVEAU_PALIER, OBTENTION_LABEL, pasSansPerte, perteArrondi, quantitePour, quantiteSansPerte, simuler,
   texteBonus, TOUS_FAMILIERS, valeurBonus, XP_CROQUETTE, xpPour, type Familier, type Obtention, type Repas, type RessourceXp,
 } from '../domain/familiers';
 import { ConfirmButton } from './ui';
-import { TABLE_RESSOURCES } from '../domain/ressourcesFamiliers';
+import { PRIX_RELEVES, RELEVES_JEU, TABLE_RESSOURCES } from '../domain/ressourcesFamiliers';
 import { readPref, writePref } from '../store/prefs';
 import { fmtK } from './couples/format';
 
@@ -19,12 +19,37 @@ const num = (v: number) => Math.round(v).toLocaleString('fr-FR');
 const dec = (v: number) => v.toLocaleString('fr-FR', { maximumFractionDigits: 3 });
 const CLE_BIBLIO = 'familiers-ressources';
 const CLE_FAVORIS = 'familiers-favoris';
+const CLE_REFERENCE = 'familiers-reference';
+/** Version des favoris de départ déjà ajoutés dans ce navigateur. */
+const CLE_FAVORIS_DEFAUT = 'familiers-favoris-defaut';
+const VERSION_FAVORIS_DEFAUT = 1;
 const CROQUETTE = 'Croquette enrichie';
 /** Favoris : nom de la ressource → valeur à l'unité et date de saisie. La croquette enrichie y est toujours. */
 type Favoris = Record<string, { valeur?: number; le?: number }>;
 const jour = (t: number) => new Date(t).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-/** Table intégrée (DPLN) ; les ajouts et vérifications de l'utilisateur passent par-dessus. */
-const BASE: RessourceXp[] = lireTable(TABLE_RESSOURCES).ressources;
+/** Table intégrée (DPLN) corrigée par les relevés en jeu ; les ajouts et vérifications de l'utilisateur passent par-dessus. */
+const RELEVES: RessourceXp[] = lireTable(RELEVES_JEU).ressources.map((r) => ({ ...r, fiabilite: 'verifiee' }));
+const BASE: RessourceXp[] = fusionner(lireTable(TABLE_RESSOURCES).ressources, RELEVES);
+
+/**
+ * Favoris du navigateur, complétés une seule fois par les ressources relevées en jeu et les prix connus.
+ * Une valeur déjà saisie n'est jamais remplacée ; une ressource retirée ensuite ne revient pas.
+ */
+function favorisDepart(): Favoris {
+  const f = readPref<Favoris>(CLE_FAVORIS, {});
+  if (readPref<number>(CLE_FAVORIS_DEFAUT, 0) >= VERSION_FAVORIS_DEFAUT) return f;
+  const le = new Date(`${PRIX_RELEVES.date}T12:00:00`).getTime();
+  const fusion: Favoris = { ...f };
+  for (const nom of [CROQUETTE, ...RELEVES.map((r) => r.nom)]) {
+    const prix = PRIX_RELEVES.prix[nom];
+    const deja = fusion[nom];
+    if (!deja) fusion[nom] = prix ? { valeur: prix, le } : {};
+    else if (!(deja.valeur && deja.valeur > 0) && prix) fusion[nom] = { valeur: prix, le };
+  }
+  writePref(CLE_FAVORIS, fusion);
+  writePref(CLE_FAVORIS_DEFAUT, VERSION_FAVORIS_DEFAUT);
+  return fusion;
+}
 const plat = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const borne = (n: number) => Math.max(0, Math.min(NIVEAU_MAX, Math.round(n) || 0));
 
@@ -87,7 +112,7 @@ function Simulateur({ familier, etat, setEtat }: { familier: Familier; etat: Eta
   const [local, setLocalState] = useState<RessourceXp[]>(() => readPref<RessourceXp[]>(CLE_BIBLIO, []));
   const setLocal = (b: RessourceXp[]) => { setLocalState(b); writePref(CLE_BIBLIO, b); };
   const biblio = useMemo(() => fusionner(BASE, local), [local]);
-  const [favoris, setFavorisState] = useState<Favoris>(() => readPref<Favoris>(CLE_FAVORIS, {}));
+  const [favoris, setFavorisState] = useState<Favoris>(favorisDepart);
   const setFavoris = (f: Favoris) => { setFavorisState(f); writePref(CLE_FAVORIS, f); };
   const estFavori = (nom: string) => Object.prototype.hasOwnProperty.call(favoris, nom);
   const basculerFavori = (nom: string) => {
@@ -120,6 +145,7 @@ function Simulateur({ familier, etat, setEtat }: { familier: Familier; etat: Eta
       </div>
 
       <MesRessources biblio={biblio} favoris={favoris} setFavoris={setFavoris} besoin={Math.max(0, besoin)} vise={vise}
+        onXp={(nom, xp) => setLocal(verifier(local, nom, xp))}
         onUtiliser={(nom, xp, quantite, valeur) => {
           if (nom === CROQUETTE) setEtat({ croquettes: quantite });
           else setEtat({ repas: [...etat.repas, { nom, xp, xpTxt: dec(xp), quantite, prix: valeur }] });
@@ -322,9 +348,11 @@ function ListeAVerifier({ biblio }: { biblio: RessourceXp[] }) {
  * Mes ressources : les favoris et la croquette enrichie, avec leur valeur à l'unité (prix d'achat, ou de revente
  * pour une ressource farmée), le coût d'un point d'XP et le coût pour le niveau visé. Tri par rentabilité, prix ou gain d'XP.
  */
-function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser }: {
+function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser, onXp }: {
   biblio: RessourceXp[]; favoris: Favoris; setFavoris: (f: Favoris) => void; besoin: number; vise: number;
   onUtiliser: (nom: string, xp: number, quantite: number, valeur?: number) => void;
+  /** XP par unité relevée en jeu pour une ressource : elle devient sa valeur vérifiée. */
+  onXp: (nom: string, xp: number) => void;
 }) {
   const [tri, setTriState] = useState<TriFavoris>(() => readPref<TriFavoris>('familiers-tri', 'rentabilite'));
   const setTri = (t: TriFavoris) => { setTriState(t); writePref('familiers-tri', t); };
@@ -339,6 +367,13 @@ function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser }
     }),
   ];
   const tries = trierFavoris(lignes, tri, besoin);
+  const rangs = classement(lignes);
+  // Référence de comparaison : la croquette enrichie, ou un autre favori choisi
+  const [refNom, setRefState] = useState<string>(() => readPref<string>(CLE_REFERENCE, CROQUETTE));
+  const setRef = (n: string) => { setRefState(n); writePref(CLE_REFERENCE, n); };
+  const ref = lignes.find((f) => f.nom === refNom) ?? lignes[0];
+  const cRef = comparer(ref, besoin);
+  const nomRef = ref.nom === CROQUETTE ? 'la croquette' : ref.nom;
   const setValeur = (nom: string, v: string) => {
     const n = Math.round(Number(v.replace(/\s/g, '').replace(',', '.')));
     setFavoris({ ...favoris, [nom]: n > 0 ? { valeur: n, le: Date.now() } : {} });
@@ -361,27 +396,35 @@ function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser }
         <input list="ressourcesXp" placeholder="Ajouter une ressource" aria-label="Ajouter une ressource aux favoris" value={ajout}
           onChange={(e) => setAjout(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ajouter()} />
         <button className="btn small ghost" disabled={!ajout.trim()} onClick={ajouter}>★ Ajouter</button>
+        <label className="inline">Comparer à
+          <select aria-label="Ressource de référence" value={ref.nom} onChange={(e) => setRef(e.target.value)}>
+            {lignes.map((f) => <option key={f.nom} value={f.nom}>{f.nom}</option>)}
+          </select>
+        </label>
         {err && <span className="ko">{err}</span>}
+        {cRef.coutXp === null && lignes.length > 1 && <span className="muted">Donne la valeur de {nomRef} pour comparer.</span>}
       </div>
       <div className="scroll">
         <table className="inv" aria-label="Comparaison des ressources">
           <thead><tr>
-            <th>Ressource</th><th className="num">XP / unité</th><th className="num">Valeur (kamas)</th><th className="num">Kamas / XP</th>
-            <th className="num">Pour le niveau {vise}</th><th />
+            <th className="num">Rang</th><th>Ressource</th><th className="num">XP / unité</th><th className="num">Valeur (kamas)</th><th className="num">Kamas / XP</th>
+            <th className="num" title="Coût du point d'XP divisé par celui de la plus rentable">Coeff</th>
+            <th>Par rapport à {nomRef}</th><th className="num">Pour le niveau {vise}</th><th />
           </tr></thead>
           <tbody>
             {tries.map((f) => {
               const c = comparer(f, besoin);
               const douteuse = f.fiabilite === 'approximative' || f.fiabilite === 'inconnue';
               return (
-                <tr key={f.nom} aria-label={f.nom}>
+                <tr key={f.nom} aria-label={f.nom} className={rangs.get(f.nom)?.rang === 1 ? 'premier' : undefined}>
+                  <td className="num" aria-label={`Rang ${f.nom}`}>{rangs.get(f.nom)?.rang ?? '—'}</td>
                   <td>
                     {f.nom !== CROQUETTE && <button className="etoile" aria-pressed="true" aria-label={`Retirer des favoris : ${f.nom}`} onClick={() => { const n = { ...favoris }; delete n[f.nom]; setFavoris(n); }}>★</button>}
                     {f.nom}
                     {douteuse && <span className="ko" title="Valeur à vérifier en jeu"> ⚠</span>}
                     {f.fiabilite === 'peu-rentable' && <span className="muted"> (peu rentable)</span>}
                   </td>
-                  <td className="num">{f.xp > 0 ? dec(f.xp) : '?'}</td>
+                  <td className="num">{f.nom === CROQUETTE ? dec(f.xp) : <CelluleXp f={f} onXp={(xp) => onXp(f.nom, xp)} />}</td>
                   <td className="num">
                     <input className="invcell" inputMode="numeric" aria-label={`Valeur ${f.nom}`} value={f.valeur ?? ''} onChange={(e) => setValeur(f.nom, e.target.value)} />
                     {f.le && <div className="muted" style={{ fontSize: '.72rem' }}>du {jour(f.le)}</div>}
@@ -389,6 +432,8 @@ function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser }
                   <td className="num">
                     {c.coutXpMin !== null && c.coutXpMax !== null ? `${dec(c.coutXpMin)} à ${dec(c.coutXpMax)}` : c.coutXp !== null ? dec(c.coutXp) : '—'}
                   </td>
+                  <td className="num" aria-label={`Coeff ${f.nom}`}><Coeff r={rangs.get(f.nom)} /></td>
+                  <td aria-label={`Écart ${f.nom}`}><Ecart f={f} c={c} refNom={ref.nom} cRef={cRef} /></td>
                   <td className="num">
                     {besoin <= 0 ? <span className="ok">atteint</span> : c.quantite !== null ? <>{num(c.quantite)}{c.cout !== null && <div className="muted" style={{ fontSize: '.78rem' }}>{fmtK(c.cout)}</div>}</> : '—'}
                   </td>
@@ -402,7 +447,49 @@ function MesRessources({ biblio, favoris, setFavoris, besoin, vise, onUtiliser }
       <p className="note" style={{ margin: '4px 0 0' }}>
         Valeur à l'unité : le prix d'achat, ou ce que tu pourrais revendre une ressource que tu as farmée (0 la classerait toujours première, à tort).
         « Utiliser » l'ajoute au simulateur avec la quantité pour le niveau visé.
+        <br />Rang et coeff : le classement par coût du point d'XP, parmi les ressources qui ont une valeur. Un coeff de 1,23 veut dire que le point d'XP
+        coûte 23 % de plus que chez la première.
+        <br />✓ : XP vérifiée en jeu. Les autres viennent de la table d'avant Dofus 3, qui a vieilli (au niveau 200, les communes sont passées de 9 à 16,8 XP) :
+        avant d'acheter en masse, donne-en un lot, et corrige l'XP dans le tableau.
       </p>
     </div>
+  );
+}
+
+/** Coefficient de rentabilité : 1,00 pour la plus rentable, 1,23 pour un point d'XP 23 % plus cher. */
+function Coeff({ r }: { r?: Rang }) {
+  if (!r) return <span className="muted">—</span>;
+  const d = (x: number) => x.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const texte = r.coeffMin !== undefined && r.coeffMax !== undefined && d(r.coeffMin) !== d(r.coeffMax) ? `${d(r.coeffMin)} à ${d(r.coeffMax)}` : d(r.coeff);
+  return r.rang === 1 ? <b className="ok">{texte}</b> : <>{texte}</>;
+}
+
+/** Écart du coût du point d'XP avec la référence : vert si moins cher, rouge si plus cher. */
+function Ecart({ f, c, refNom, cRef }: { f: Favori; c: ReturnType<typeof comparer>; refNom: string; cRef: ReturnType<typeof comparer> }) {
+  if (f.nom === refNom) return <span className="muted">référence</span>;
+  const e = ecartReference(c, cRef);
+  if (!e) return <span className="muted">—</span>;
+  const { texte, sens } = texteEcart(e);
+  return <span className={sens === 'moins' ? 'ok' : sens === 'plus' ? 'ko' : 'muted'}>{texte}</span>;
+}
+
+/** XP par unité d'un favori, corrigeable : la valeur tapée (validée par Entrée ou en quittant la case) devient la valeur vérifiée. */
+function CelluleXp({ f, onXp }: { f: Favori; onXp: (xp: number) => void }) {
+  const [brouillon, setBrouillon] = useState<string | null>(null);
+  const valider = () => {
+    if (brouillon === null) return;
+    const v = Math.round(Number(brouillon.replace(/\s/g, '').replace(',', '.')) * 10000) / 10000;
+    if (v > 0 && Math.abs(v - f.xp) > 1e-9) onXp(v);
+    setBrouillon(null);
+  };
+  const verifiee = f.fiabilite === 'verifiee';
+  return (
+    <span className="xpcell">
+      <input className="invcell" inputMode="decimal" aria-label={`XP par unité ${f.nom}`} value={brouillon ?? (f.xp > 0 ? dec(f.xp) : '')}
+        title={verifiee ? 'XP vérifiée en jeu' : 'XP de la table, d’avant Dofus 3 : remplace-la par celle du jeu'}
+        onChange={(e) => setBrouillon(e.target.value)} onBlur={valider}
+        onKeyDown={(e) => { if (e.key === 'Enter') valider(); if (e.key === 'Escape') setBrouillon(null); }} />
+      <span className={verifiee ? 'ok' : 'vide'} aria-hidden={!verifiee} title={verifiee ? 'XP vérifiée en jeu' : undefined}>{verifiee ? '✓' : ''}</span>
+    </span>
   );
 }

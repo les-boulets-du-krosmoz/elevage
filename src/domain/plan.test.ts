@@ -12,10 +12,10 @@ describe('couleurs', () => {
   it('connaît les 66 couleurs', () => expect(COLORS).toHaveLength(66));
   it('tolère accents manquants et ordre inversé', () => {
     expect(findColor('rousse et amande')?.name).toBe('Amande et Rousse');
-    expect(findColor('Ebene')?.name).toBe('Ebène');
+    expect(findColor('Ebene')?.name).toBe('Ébène');
   });
   it('calcule le ratio de l’arbre', () => {
-    const w = treeWeights('Ebène et Indigo');
+    const w = treeWeights('Ébène et Indigo');
     expect(w.get('Amande et Dorée')).toBe(2);
     expect(w.get('Dorée et Rousse')).toBe(1);
     expect(w.get('Amande et Rousse')).toBe(1);
@@ -24,13 +24,13 @@ describe('couleurs', () => {
 
 describe('planCycle', () => {
   it('ne dépasse jamais les places disponibles', () => {
-    const p = planCycle([], 'Ebène et Indigo', 13);
+    const p = planCycle([], 'Ébène et Indigo', 13);
     expect(p.crossings.reduce((s, c) => s + c.n, 0)).toBe(6);
   });
 
   it('chaque achat fait baisser le total d’exactement 1', () => {
-    const cols = ['Amande', 'Dorée', 'Rousse', 'Amande et Dorée', 'Dorée et Rousse', 'Amande et Rousse', 'Ebène', 'Indigo'];
-    const targets = ['Ebène et Indigo', 'Pourpre', 'Amande et Dorée', 'Ebène', 'Orchidée et Pourpre'];
+    const cols = ['Amande', 'Dorée', 'Rousse', 'Amande et Dorée', 'Dorée et Rousse', 'Amande et Rousse', 'Ébène', 'Indigo'];
+    const targets = ['Ébène et Indigo', 'Pourpre', 'Amande et Dorée', 'Ébène', 'Orchidée et Pourpre'];
     let seed = 42;
     const rnd = (n: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % n; };
     for (let it = 0; it < 400; it++) {

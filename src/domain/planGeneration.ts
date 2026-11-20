@@ -139,3 +139,43 @@ export function planGeneration(espece: Espece, dd: Monture[], rec: RecettesEspec
 
 /** Couleurs possibles d'un bébé : la couleur visée, puis celles des parents (les grands-parents passent par « autre »). */
 export const naissancesPossibles = (lot: Pick<LotPlan, 'bebe' | 'm' | 'f'>) => [...new Set([lot.bebe, lot.m, lot.f])];
+
+/** La couleur visée par un couple (la plus haute s'il y en a plusieurs), ou null s'il ne forme aucune recette. */
+export function cibleDuCouple(espece: Espece, rec: RecettesEspece, m: string, f: string): string | null {
+  const t = Object.entries(rec).filter(([, ps]) => ps.some(([a, b]) => (a === m && b === f) || (a === f && b === m))).map(([c]) => c);
+  return t.sort((x, y) => gen(espece, y) - gen(espece, x))[0] ?? null;
+}
+
+/**
+ * Plan qui évolue avec la session : les accouplements déjà notés (pas encore validés) réservent leurs parents,
+ * le reste du stock est replanifié, et chaque couple noté reste affiché avec ses accouplements en plus,
+ * même s'il ne figure plus dans le nouveau plan. Les parents réservés suivent l'ordre de la validation.
+ */
+export function planAvecSession(espece: Espece, dd: Monture[], rec: RecettesEspece, cibles: string[], notes: Record<string, number>): PlanGeneration {
+  let reste = dd;
+  for (const [cle, k] of Object.entries(notes)) {
+    if (k <= 0) continue;
+    const [m, f] = cle.split('|');
+    for (const [c, x] of [[m, 'M'], [f, 'F']] as [string, Sex][]) {
+      const pris = reste.filter((d) => d.espece === espece && d.etat === 'feconde' && d.sexe === x && findColorIn(espece, d.couleur)?.name === c)
+        .sort((a, b) => Number(!!b.reproducteur) - Number(!!a.reproducteur) || a.created - b.created).slice(0, k);
+      const ids = new Set(pris.map((d) => d.id));
+      reste = reste.filter((d) => !ids.has(d.id));
+    }
+  }
+  const p = planGeneration(espece, reste, rec, cibles);
+  const lots: LotPlan[] = [];
+  for (const [cle, k] of Object.entries(notes)) {
+    if (k <= 0) continue;
+    const [m, f] = cle.split('|');
+    const l = p.lots.find((x) => x.m === m && x.f === f);
+    if (l) lots.push({ ...l, n: l.n + k });
+    else {
+      const bebe = cibleDuCouple(espece, rec, m, f) ?? m;
+      lots.push({ m, f, n: k, bebe, gen: gen(espece, bebe), role: 'epuise' });
+    }
+  }
+  lots.push(...p.lots.filter((l) => !notes[`${l.m}|${l.f}`]));
+  const ordre: Record<Role, number> = { atteint: 0, prepare: 1, epuise: 2 };
+  return { lots: lots.sort((a, b) => ordre[a.role] - ordre[b.role] || b.gen - a.gen || b.n - a.n), restes: p.restes, cibles };
+}
