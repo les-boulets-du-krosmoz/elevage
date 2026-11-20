@@ -26,7 +26,7 @@ export function ARetenir({ espece, rec }: { espece: Espece; rec: RecettesEspece 
           const p = d.aTester ? pistes(espece, d, dd, rec).slice(0, 3) : [];
           return (
             <li key={d.id}>
-              <b>{d.nom ?? '—'}</b> <MountTag c={findColorIn(espece, d.couleur)?.name ?? d.couleur} x={d.sexe} />{' '}
+              <b>{d.nom ?? '—'}</b> <MountTag espece={espece} c={findColorIn(espece, d.couleur)?.name ?? d.couleur} x={d.sexe} />{' '}
               <span className="muted">{d.etat === 'feconde' ? 'féconde' : 'fertile'}</span>
               {d.reproducteur && <span className="badge" style={{ marginLeft: 6 }}>reproducteur : 2 bébés</span>}
               {(d.pere || d.mere) && <span className="muted"> · parents {d.pere} × {d.mere}</span>}
@@ -34,7 +34,7 @@ export function ARetenir({ espece, rec }: { espece: Espece; rec: RecettesEspece 
                 <div className="note" style={{ margin: '2px 0 0 18px' }}>
                   À tester avec{' '}
                   {p.map((x, i) => (
-                    <span key={`${x.avec}|${x.vise}`}>{i ? ', ' : ''}<SexMark x={x.sexe} /> {x.avec}{x.dispo ? ` (${x.dispo} féconde${x.dispo > 1 ? 's' : ''})` : ''} → <Swatch name={x.vise} size={11} /> {x.vise} possible</span>
+                    <span key={`${x.avec}|${x.vise}`}>{i ? ', ' : ''}<SexMark x={x.sexe} /> {x.avec}{x.dispo ? ` (${x.dispo} féconde${x.dispo > 1 ? 's' : ''})` : ''} → <Swatch espece={espece} name={x.vise} size={11} /> {x.vise} possible</span>
                   ))}
                 </div>
               )}

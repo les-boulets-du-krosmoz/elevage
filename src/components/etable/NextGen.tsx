@@ -25,14 +25,14 @@ export function NextGen({ onOther }: { onOther: (b: BarTarget) => void }) {
       {rows.map((r) => (
         <div className="trow" key={r.color.name}>
           <div className="lead">
-            <span className="muted">G{r.color.gen}</span> <Swatch name={r.color.name} size={16} /> <b>{r.color.name}</b>{' '}
+            <span className="muted">G{r.color.gen}</span> <Swatch espece="dragodinde" name={r.color.name} size={16} /> <b>{r.color.name}</b>{' '}
             <span className="muted">· {r.total} couple{r.total > 1 ? 's' : ''} max</span>
           </div>
           <div className="slots" style={{ marginLeft: 0 }}>
             {r.options.map((o) => (
               <button key={o.m} className="pair" aria-expanded={isOpen(o.m, o.f, r.color.name)}
                 onClick={() => setOpen(isOpen(o.m, o.f, r.color.name) ? null : { m: o.m, f: o.f, child: r.color.name })}>
-                {o.n}× <MountTag c={o.m} x="M" size={12} /> × <MountTag c={o.f} x="F" size={12} />
+                {o.n}× <MountTag espece="dragodinde" c={o.m} x="M" size={12} /> × <MountTag espece="dragodinde" c={o.f} x="F" size={12} />
               </button>
             ))}
           </div>

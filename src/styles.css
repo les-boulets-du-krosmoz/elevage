@@ -260,6 +260,34 @@ th svg.sexicon.sex-M{color:var(--male)}th svg.sexicon.sex-F{color:var(--female)}
 .averifier summary{cursor:pointer}
 .averifier ul{max-height:260px;overflow:auto;margin:0;padding-left:18px;font-size:.85rem}
 .mesres{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:10px;background:var(--bg)}
-.mesres .invcell{width:6.5em}
+.mesres .invcell{width:5.5em}
+.mesres table.inv th{white-space:normal;vertical-align:bottom;line-height:1.2}
+.mesres table.inv td,.mesres table.inv th{padding:5px 6px}
+.mesres tr.premier td{background:color-mix(in srgb, var(--ok, #2e7d4f) 9%, transparent)}
+.xpcell{display:inline-flex;align-items:center;gap:4px}.xpcell .invcell{width:4.5em}.xpcell>span{display:inline-block;width:1em;text-align:left}
 .etoile{background:none;border:0;cursor:pointer;color:var(--gold);font-size:1.05rem;padding:0 4px;line-height:1}
 .etoile[aria-pressed="false"]{color:var(--muted)}
+.mi{display:inline-block;vertical-align:middle;object-fit:contain;margin:-4px 0}
+.groupe-male{border-top:2px solid var(--line);padding-top:6px;margin-top:6px}
+.groupe-male:first-of-type{border-top:0;margin-top:0}
+.groupe-tete{font-size:.92rem;margin-bottom:2px}
+
+/* Commande vocale */
+.voix{border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin:0 0 10px}
+.voix-retour{margin:6px 0 0;font-size:.9rem}
+.ecoute{color:var(--warn);font-weight:700;font-size:.85rem;animation:clignote 1.2s infinite}
+@keyframes clignote{50%{opacity:.35}}
+
+/* Mode session */
+.session-groupe{margin-top:10px}
+.session-titre{font-size:1rem;margin:4px 0}
+.carte-lot{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;cursor:pointer;background:var(--panel)}
+.carte-lot.actif{border:2px solid var(--pine);cursor:default;box-shadow:0 0 0 3px color-mix(in srgb,var(--pine) 15%,transparent)}
+.carte-tete{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:1.05rem}
+.carte-tete .parent{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+.compteur{margin-left:auto;font-family:"Bricolage Grotesque",sans-serif;font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums}
+.bebes{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.bebe{display:inline-flex;align-items:center;gap:3px}
+.autre{display:inline-flex;align-items:center;gap:3px}
+.modeles{margin:6px 0 0;font-size:.82rem;color:var(--muted)}
+.modeles q{color:var(--ink);font-weight:600}

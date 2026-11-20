@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useEtable } from '../store/EtableContext';
 import { useToast } from '../store/ToastContext';
-import { parseBackup, toBackup } from '../store/storage';
+import { ecrireFamiliers, lireFamiliers, parseBackup, toBackup } from '../store/storage';
 import { ConfirmButton } from './ui';
 
 export function DataPage() {
@@ -12,10 +12,14 @@ export function DataPage() {
   const file = useRef<HTMLInputElement>(null);
 
   const doImport = (raw: string) => {
-    try { importData(parseBackup(raw), mode); } catch { toast.show('Fichier illisible : ce n’est pas une sauvegarde Étable'); }
+    try {
+      const { familiers, ...data } = parseBackup(raw);
+      importData(data, mode);
+      if (familiers) ecrireFamiliers(familiers, mode);
+    } catch { toast.show('Fichier illisible : ce n’est pas une sauvegarde Étable'); }
   };
   const doExport = () => {
-    const url = URL.createObjectURL(new Blob([toBackup({ dd, history, settings, breaks, queue, extract })], { type: 'application/json' }));
+    const url = URL.createObjectURL(new Blob([toBackup({ dd, history, settings, breaks, queue, extract }, lireFamiliers())], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `etable-dragodindes-${new Date().toISOString().slice(0, 10)}.json`;
@@ -26,10 +30,10 @@ export function DataPage() {
   return (
     <section className="panel" style={{ display: 'grid', gap: 14 }}>
       <p className="syncinfo" style={{ margin: 0 }}>
-        Enregistré dans le cache de ce navigateur : {dd.length} DD. Vider le cache efface tout : exporte régulièrement.
+        Enregistré dans le cache de ce navigateur : {dd.length} montures. Vider le cache efface tout : exporte régulièrement.
       </p>
       <div>
-        <button className="btn ghost" onClick={doExport}>Exporter (DD, historique, brisages et réglages)</button>
+        <button className="btn ghost" onClick={doExport}>Exporter (montures, historique, brisages, réglages et familiers)</button>
       </div>
       <fieldset>
         <legend>Importer</legend>
@@ -60,7 +64,7 @@ export function DataPage() {
       </fieldset>
       <div>
         <ConfirmButton className="btn danger" confirmLabel="Confirmer l’effacement ?"
-          onConfirm={() => act('effacement', `${dd.length} DD effacées`, { del: dd })}>Tout effacer</ConfirmButton>
+          onConfirm={() => act('effacement', `${dd.length} montures effacées`, { del: dd })}>Tout effacer</ConfirmButton>
       </div>
     </section>
   );

@@ -192,8 +192,8 @@ export function fourchette(r: RessourceXp): [number, number] | null {
 export function fusionner(biblio: RessourceXp[], ajout: RessourceXp[]): RessourceXp[] {
   const cle = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const map = new Map(biblio.map((r) => [cle(r.nom), r]));
-  // Une valeur vérifiée en jeu n'est jamais écrasée par une table
-  for (const r of ajout) if (map.get(cle(r.nom))?.fiabilite !== 'verifiee') map.set(cle(r.nom), r);
+  // Une valeur vérifiée en jeu n'est jamais écrasée par une table ; une nouvelle vérification la remplace
+  for (const r of ajout) if (r.fiabilite === 'verifiee' || map.get(cle(r.nom))?.fiabilite !== 'verifiee') map.set(cle(r.nom), r);
   return [...map.values()].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
 }
 
@@ -239,6 +239,67 @@ export function comparer(f: Favori, besoin: number): Comparaison {
     quantite,
     cout: v !== null && quantite !== null ? quantite * v : null,
   };
+}
+
+/**
+ * Coût du point d'XP rapporté à celui d'une ressource de référence (la croquette enrichie par défaut) :
+ * 0,6 = 40 % moins cher, 1,5 = 50 % plus cher. Fourchette quand l'XP de la ressource est approximative.
+ */
+export function ecartReference(c: Comparaison, ref: Comparaison): [number, number] | null {
+  const r = ref.coutXp;
+  const lo = c.coutXpMin ?? c.coutXp;
+  const hi = c.coutXpMax ?? c.coutXp;
+  if (r === null || !(r > 0) || lo === null || hi === null) return null;
+  return [lo / r, hi / r];
+}
+
+export type Sens = 'moins' | 'plus' | 'egal' | 'incertain';
+
+/** « 40 % moins cher », « 2,5 fois plus cher », « 10 à 25 % moins cher », ou « selon l'XP réelle » si la fourchette passe d'un côté à l'autre. */
+export function texteEcart([lo, hi]: [number, number]): { texte: string; sens: Sens } {
+  const pct = (x: number) => Math.round(Math.abs(1 - x) * 100);
+  const fois = (x: number) => x.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+  if (pct(lo) === 0 && pct(hi) === 0) return { texte: 'même coût', sens: 'egal' };
+  if (hi < 1) {
+    const [a, b] = [pct(hi), pct(lo)];
+    return { texte: `${a === b ? a : `${a} à ${b}`} % moins cher`, sens: 'moins' };
+  }
+  if (lo > 1) {
+    if (hi >= 2) return { texte: `${fois(lo) === fois(hi) ? fois(hi) : `${fois(lo)} à ${fois(hi)}`} fois plus cher`, sens: 'plus' };
+    const [a, b] = [pct(lo), pct(hi)];
+    return { texte: `${a === b ? a : `${a} à ${b}`} % plus cher`, sens: 'plus' };
+  }
+  return { texte: 'selon l’XP réelle', sens: 'incertain' };
+}
+
+/** Place d'une ressource dans le classement de rentabilité. */
+export interface Rang {
+  /** 1 = le point d'XP le moins cher ; les ex æquo partagent leur rang. */
+  rang: number;
+  /** Coût du point d'XP ÷ celui de la première : 1,23 = 23 % plus cher que la plus rentable. */
+  coeff: number;
+  /** Bornes du coefficient quand l'XP de la ressource est approximative. */
+  coeffMin?: number;
+  coeffMax?: number;
+}
+
+/** Classement de rentabilité des ressources qui ont une valeur ; les autres n'y figurent pas. */
+export function classement(list: Favori[]): Map<string, Rang> {
+  const avecPrix = list
+    .map((f) => ({ f, c: comparer(f, 0) }))
+    .filter((x): x is { f: Favori; c: Comparaison & { coutXp: number } } => x.c.coutXp !== null)
+    .sort((a, b) => a.c.coutXp - b.c.coutXp);
+  const res = new Map<string, Rang>();
+  if (!avecPrix.length) return res;
+  const meilleur = avecPrix[0].c.coutXp;
+  avecPrix.forEach(({ f, c }, i) => {
+    const precedent = i > 0 ? avecPrix[i - 1] : null;
+    const rang = precedent && Math.abs(precedent.c.coutXp - c.coutXp) < 1e-9 ? res.get(precedent.f.nom)!.rang : i + 1;
+    const r: Rang = { rang, coeff: c.coutXp / meilleur };
+    if (c.coutXpMin !== null && c.coutXpMax !== null) { r.coeffMin = c.coutXpMin / meilleur; r.coeffMax = c.coutXpMax / meilleur; }
+    res.set(f.nom, r);
+  });
+  return res;
 }
 
 export type TriFavoris = 'rentabilite' | 'prix' | 'xp';

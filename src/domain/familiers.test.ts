@@ -138,3 +138,60 @@ describe('familiers : favoris et rentabilité', () => {
     expect(trierFavoris(favoris, 'xp', 1000).map((f) => f.nom)).toEqual(['Galet acajou', 'Croquette enrichie', 'Rose des sables', 'Pince de Crabe Hijacob']);
   });
 });
+
+import { ecartReference, texteEcart } from './familiers';
+import { RELEVES_JEU } from './ressourcesFamiliers';
+
+describe('familiers : comparaison avec une référence', () => {
+  const croquette = comparer({ nom: 'Croquette enrichie', xp: 500, valeur: 4000 }, 0); // 8 kamas par XP
+  const e = (f: Favori) => ecartReference(comparer(f, 0), croquette);
+  it('rapporte le coût du point d’XP à celui de la référence', () => {
+    expect(e({ nom: 'Rose des sables', xp: 1.25, valeur: 5 })).toEqual([0.5, 0.5]);
+    expect(texteEcart(e({ nom: 'Rose des sables', xp: 1.25, valeur: 5 })!)).toEqual({ texte: '50 % moins cher', sens: 'moins' });
+    expect(texteEcart(e({ nom: 'Aile', xp: 16.8, valeur: 168 })!)).toEqual({ texte: '25 % plus cher', sens: 'plus' });
+    expect(texteEcart(e({ nom: 'Galet', xp: 1250, valeur: 25000 })!)).toEqual({ texte: '2,5 fois plus cher', sens: 'plus' });
+    expect(texteEcart(e({ nom: 'Pareil', xp: 1, valeur: 8 })!)).toEqual({ texte: 'même coût', sens: 'egal' });
+  });
+  it('donne une fourchette pour une XP approximative, et ne tranche pas si elle passe de l’autre côté', () => {
+    expect(texteEcart(e({ nom: 'Pince', xp: 1 / 3, valeur: 1, plage: [1 / 3, 2 / 3] })!)).toEqual({ texte: '63 à 81 % moins cher', sens: 'moins' });
+    expect(texteEcart(e({ nom: 'Pince', xp: 1 / 3, valeur: 4, plage: [1 / 3, 2 / 3] })!).sens).toBe('incertain');
+  });
+  it('sans valeur, pas de comparaison', () => {
+    expect(e({ nom: 'Rose des sables', xp: 1.25 })).toBeNull();
+    expect(ecartReference(comparer({ nom: 'Rose', xp: 1.25, valeur: 5 }, 0), comparer({ nom: 'Croquette enrichie', xp: 500 }, 0))).toBeNull();
+  });
+});
+
+describe('familiers : relevés en jeu', () => {
+  it('passent avant la table, et une vérification de l’utilisateur passe avant eux', () => {
+    const releves = lireTable(RELEVES_JEU).ressources.map((r) => ({ ...r, fiabilite: 'verifiee' as const }));
+    const base = fusionner(lireTable(TABLE_RESSOURCES).ressources, releves);
+    const r = (nom: string) => base.find((x) => x.nom === nom)!;
+    expect([r('Aile de Sinistrofu').xp, r('Aile de Sinistrofu').fiabilite]).toEqual([16.8, 'verifiee']);
+    expect(r('Queue de Sinistrofu').xp).toBe(101);
+    expect(r('Plume Vibrante du Tofu Royal').xp).toBe(48.8);
+    expect([r('Peau de Trithon').xp, r('Dent de Klémort').xp, r('Défense de Brutapir').fiabilite]).toEqual([111, 18, 'verifiee']);
+    expect(fusionner(base, [{ nom: 'Aile de Sinistrofu', xp: 9, fiabilite: 'fiable' }]).find((x) => x.nom === 'Aile de Sinistrofu')!.xp).toBe(16.8);
+    expect(verifier(base, 'Aile de Sinistrofu', 16.875).find((x) => x.nom === 'Aile de Sinistrofu')!.xp).toBe(16.875);
+  });
+});
+
+import { classement } from './familiers';
+
+describe('familiers : classement de rentabilité', () => {
+  it('rang et coeff par coût du point d’XP ; ex æquo au même rang ; sans valeur, hors classement', () => {
+    const c = classement([
+      { nom: 'Croquette enrichie', xp: 500, valeur: 38882 },
+      { nom: 'Peau de Trithon', xp: 111, valeur: 3400 },
+      { nom: 'Dent de Cuirboule', xp: 101, valeur: 3800 },
+      { nom: 'Queue de Sinistrofu', xp: 101, valeur: 3800 },
+      { nom: 'Pince', xp: 1 / 3, valeur: 20, plage: [1 / 3, 2 / 3] },
+      { nom: 'Défense de Brutapir', xp: 101 },
+    ]);
+    expect(c.get('Peau de Trithon')).toEqual({ rang: 1, coeff: 1 });
+    expect([c.get('Dent de Cuirboule')!.rang, c.get('Queue de Sinistrofu')!.rang, c.get('Pince')!.rang, c.get('Croquette enrichie')!.rang]).toEqual([2, 2, 4, 5]);
+    expect(c.get('Dent de Cuirboule')!.coeff).toBeCloseTo(1.228, 3);
+    expect([c.get('Pince')!.coeffMin, c.get('Pince')!.coeffMax]).toEqual([30 / (3400 / 111), 60 / (3400 / 111)]);
+    expect(c.has('Défense de Brutapir')).toBe(false);
+  });
+});

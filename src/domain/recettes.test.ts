@@ -15,7 +15,7 @@ describe('lot C : recettes DPLN', () => {
   });
 
   it('chaque recette est un couple de deux bicolores plus jeunes, dont une de la génération précédente', () => {
-    // Exemple DPLN : Volkorne Jade (G9) = Doré et Pourpre (G8) + Prune et Emeraude (G6)
+    // Exemple DPLN : Volkorne Jade (G9) = Doré et Pourpre (G8) + Prune et Émeraude (G6)
     for (const e of ['muldo', 'volkorne'] as const) {
       for (const [c, list] of Object.entries(RECETTES_DPLN[e]!)) {
         const g = findColorIn(e, c)!.gen;
@@ -42,7 +42,7 @@ describe('lot C : recettes DPLN', () => {
   it('les bicolores de Kevin sont bien des recettes du Roux et de l’Amande', () => {
     const n = (s: string) => findColorIn('muldo', s)!.name;
     expect(RECETTES_DPLN.muldo!.Roux.some((p) => memePaire(p, [n('Doré et Orchidée'), n('Doré et Pourpre')]))).toBe(true);
-    expect(RECETTES_DPLN.muldo!.Amande.some((p) => memePaire(p, [n('Indigo et Pourpre'), n('Ebène et Orchidée')]))).toBe(true);
+    expect(RECETTES_DPLN.muldo!.Amande.some((p) => memePaire(p, [n('Indigo et Pourpre'), n('Ébène et Orchidée')]))).toBe(true);
   });
 
   it('une bicolore a ses deux monocolores pour recette ; une recette modifiée remplace DPLN', () => {

@@ -198,13 +198,13 @@ function RecetteCouleur({ espece, couleur, gen, list, perso, onChange }:
   return (
     <details className="recette">
       <summary>
-        <Swatch name={couleur} size={14} /> <b>{couleur}</b> <span className="muted">G{gen} · {list.length} recette{list.length > 1 ? 's' : ''}</span>
+        <Swatch espece={espece} name={couleur} size={14} /> <b>{couleur}</b> <span className="muted">G{gen} · {list.length} recette{list.length > 1 ? 's' : ''}</span>
         {perso && <span className="badge">modifiée</span>}
       </summary>
       <ul>
         {list.map((p) => (
           <li key={p.join('|')}>
-            <Swatch name={p[0]} size={12} /> {p[0]} <span className="muted">+</span> <Swatch name={p[1]} size={12} /> {p[1]}
+            <Swatch espece={espece} name={p[0]} size={12} /> {p[0]} <span className="muted">+</span> <Swatch espece={espece} name={p[1]} size={12} /> {p[1]}
             {douteuses.some((q) => memePaire(p, q)) && <span className="warn-txt" title="Semble erronée chez DPLN"> · à vérifier en jeu</span>}
             <button className="x" aria-label={`Retirer ${p[0]} + ${p[1]}`} onClick={() => onChange(list.filter((q) => q !== p))}>×</button>
           </li>

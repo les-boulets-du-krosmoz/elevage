@@ -1109,3 +1109,26 @@ Oeil d'Abrakne|?|
 Ambre d'Abraknyde Sombre|?|
 Écorce d'Abraknyde Vénérable|?|
 Arakne Écrabouillée|?|`;
+
+/**
+ * Relevés en jeu (Dofus 3, novembre 2026, par Kevin) : « nom | XP obtenue | quantité donnée ».
+ * Ils passent avant la table et montrent qu'elle a vieilli : au niveau 200, les ressources communes
+ * sont passées de 9 à 16,8 XP par unité (au moins) et les rares de 92 à 101.
+ */
+export const RELEVES_JEU = `Aile de Sinistrofu|168|10
+Canine de Kanimate|168|10
+Oeil de Harrogant|168|10
+Queue de Sinistrofu|101|1
+Plume de Cycloïde|101|1
+Plume Vibrante du Tofu Royal|488|10
+Peau de Trithon|111|1
+Front osseux de Gropotam|101|1
+Défense de Brutapir|101|1
+Dent de Cuirboule|101|1
+Dent de Klémort|18|1`;
+
+/** Prix relevés à l'HDV (kamas l'unité), pour pré-remplir « Mes ressources » ; une valeur déjà saisie n'est jamais remplacée. */
+export const PRIX_RELEVES: { date: string; prix: Record<string, number> } = {
+  date: '2026-11-20',
+  prix: { 'Croquette enrichie': 38882, 'Peau de Trithon': 3400 },
+};

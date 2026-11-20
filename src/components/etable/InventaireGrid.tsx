@@ -1,9 +1,11 @@
-import { Fragment, useMemo, useState, type KeyboardEvent } from 'react';
+import { Fragment, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { colorsOf, findColorIn, SPECIES_LABEL, type Color, type Espece, type Sex } from '../../domain/colors';
 import { newMonture } from '../../domain/stock';
 import type { BreakSpecies, Etat, Monture, QueueDelta } from '../../domain/types';
 import { useEtable } from '../../store/EtableContext';
+import { lireInventaire, plat as aplatir } from '../../domain/voix';
 import { ConfirmButton, SexMark, Swatch } from '../ui';
+import { BarreVoix, type Retour } from '../Voix';
 
 /** Saisie d'une ligne : ce que l'utilisateur a tapé, et le dernier sexe saisi (celui qu'on garde quand le total change). */
 interface Row { t?: string; m?: string; f?: string; b?: string; fixed?: Sex; totalTyped?: boolean }
@@ -79,12 +81,19 @@ export function InventaireGrid({ espece, onDone }: { espece: Espece; onDone: () 
     return { ...all, [c]: r };
   });
 
+  // « Les miennes » : seulement les couleurs connues dans l'état compté (ou déjà saisies) ; une recherche montre tout ce qui correspond
+  const aDuStock = colors.some((c) => current[c.name] || curQueue(c.name));
+  const [miennes, setMiennes] = useState(aDuStock);
+  const plat = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const byGen = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = plat(search.trim());
     const g = new Map<number, Color[]>();
-    for (const c of colors) if (!q || c.name.toLowerCase().includes(q)) g.set(c.gen, [...(g.get(c.gen) ?? []), c]);
+    for (const c of colors) {
+      const visible = q ? plat(c.name).includes(q) : !miennes || current[c.name] || curQueue(c.name) || rows[c.name];
+      if (visible) g.set(c.gen, [...(g.get(c.gen) ?? []), c]);
+    }
     return [...g].sort((a, b) => a[0] - b[0]);
-  }, [colors, search]);
+  }, [colors, search, miennes, current, queue, rows]);
   const gensWithStock = useMemo(() => new Set(colors.filter((c) => current[c.name] || curQueue(c.name)).map((c) => c.gen)),
     [colors, current, queue]);
   const [open, setOpen] = useState<Set<number>>(() => new Set([1, 2, ...gensWithStock]));
@@ -122,8 +131,55 @@ export function InventaireGrid({ espece, onDone }: { espece: Espece; onDone: () 
     onDone();
   };
 
-  // ↑ ↓ et Entrée : même colonne, ligne précédente ou suivante
+  // Commande vocale (ou phrase tapée) : « Doré, douze mâles, cinq femelles » ; « annuler » défait la dernière
+  const historique = useRef<Record<string, Row>[]>([]);
+  const dicter = (phrase: string): Retour => {
+    const r = lireInventaire(espece, phrase);
+    if (!r) return { ok: false, texte: 'pas compris : dis la couleur, puis « total », « mâles » ou « femelles » avec un nombre' };
+    if ('commande' in r) {
+      if (r.commande === 'annuler') {
+        const avant = historique.current.pop();
+        if (!avant) return { ok: false, texte: 'rien à annuler' };
+        setRows(avant);
+        return { ok: true, texte: 'dernière saisie annulée' };
+      }
+      if (r.commande === 'valider') { apply(); return { ok: true, texte: 'inventaire validé' }; }
+      onDone();
+      return { ok: true, texte: 'inventaire fermé' };
+    }
+    historique.current.push(rows);
+    const { t, m: mm, f: ff, b: bb } = r.champs;
+    if (t !== undefined) edit(r.couleur, 't', String(t));
+    if (mm !== undefined) edit(r.couleur, 'm', String(mm));
+    if (ff !== undefined) edit(r.couleur, 'f', String(ff));
+    if (bb !== undefined && breakable) edit(r.couleur, 'b', String(bb));
+    const morceaux = [t !== undefined && `total ${t}`, mm !== undefined && `${mm} ♂`, ff !== undefined && `${ff} ♀`, bb !== undefined && breakable && `${bb} à briser`].filter(Boolean);
+    return { ok: true, texte: `${r.couleur} : ${morceaux.join(', ')}` };
+  };
+
+  // Clavier : lettres = aller à une couleur ; ↑ ↓ et Entrée = même colonne ; Ctrl + Entrée = valider ; Échap = fermer
+  const saisie = useRef({ texte: '', le: 0 });
+  const esc = (x: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(x) : x.replace(/["\\]/g, '\\$&'));
+  const allerA = (debut: string) => {
+    const c = colors.find((x) => aplatir(x.name).startsWith(debut)) ?? colors.find((x) => aplatir(x.name).includes(debut));
+    if (!c) return;
+    if (!rows[c.name] && !document.querySelector(`input[data-couleur="${esc(c.name)}"]`)) setRows((all) => ({ ...all, [c.name]: {} }));
+    setTimeout(() => document.querySelector<HTMLInputElement>(`input[data-couleur="${esc(c.name)}"][data-champ="t"]`)?.focus(), 0);
+  };
+  // Phrases types, avec une couleur réelle de l'espèce (la première que tu possèdes)
+  const exemple = colors.find((c) => current[c.name])?.name ?? colors[0]?.name ?? 'Doré';
+  const modeles = [`${exemple}, 12 mâles, 5 femelles`, `${exemple}, total 20, femelles 8`, ...(breakable ? [`${exemple}, à briser 6`] : []), 'annuler', 'valider'];
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); apply(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); onDone(); return; }
+    if (e.key.length === 1 && /\p{L}/u.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const s = saisie.current;
+      s.texte = (Date.now() - s.le < 900 ? s.texte : '') + aplatir(e.key);
+      s.le = Date.now();
+      allerA(s.texte);
+      return;
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') return;
     e.preventDefault();
     const inputs = [...document.querySelectorAll<HTMLInputElement>(`input[data-col="${e.currentTarget.dataset.col}"]`)];
@@ -132,7 +188,7 @@ export function InventaireGrid({ espece, onDone }: { espece: Espece; onDone: () 
   };
   const cell = (c: string, field: 't' | 'm' | 'f' | 'b', value: string, label: string, changed: boolean, col: number) => (
     <td className="num">
-      <input className={`invcell${changed ? ' changed' : ''}${field === 't' ? ' total' : ''}`} inputMode="numeric" data-col={col}
+      <input className={`invcell${changed ? ' changed' : ''}${field === 't' ? ' total' : ''}`} inputMode="numeric" data-col={col} data-couleur={c} data-champ={field}
         aria-label={label} value={value} onFocus={(e) => e.target.select()} onChange={(e) => edit(c, field, e.target.value)} onKeyDown={onKey} />
     </td>
   );
@@ -145,15 +201,20 @@ export function InventaireGrid({ espece, onDone }: { espece: Espece; onDone: () 
           <button aria-pressed={etat === 'feconde'} onClick={() => setEtat('feconde')}>Fécondes</button>
           <button aria-pressed={etat === 'fertile'} onClick={() => setEtat('fertile')}>Fertiles</button>
         </span>
-        <input type="search" placeholder="Chercher une couleur" aria-label="Chercher une couleur" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <span className="seg" role="group" aria-label="Couleurs affichées">
+          <button aria-pressed={miennes} onClick={() => setMiennes(true)}>Les miennes</button>
+          <button aria-pressed={!miennes} onClick={() => setMiennes(false)}>Toutes</button>
+        </span>
+        <input type="search" placeholder="Chercher une couleur (même nouvelle)" aria-label="Chercher une couleur" value={search} onChange={(e) => setSearch(e.target.value)} />
         <span style={{ flex: 1 }} />
         <ConfirmButton confirmLabel="Tout mettre à 0 ?" onConfirm={() => setRows(Object.fromEntries(colors.map((c) => [c.name, { t: '0', m: '0', f: '0', b: '0' }])))}>
           Partir de zéro
         </ConfirmButton>
       </div>
+      <BarreVoix label="Dictée de l'inventaire" onPhrase={dicter} modeles={modeles} />
       <p className="note" style={{ marginTop: 0 }}>
         Pour chaque couleur : tape le <b>total</b> affiché par le jeu, puis le nombre du <b>sexe le moins nombreux</b> ; l'autre se calcule seul.
-        Tab pour avancer, ↑ ↓ ou Entrée pour changer de ligne. La grille part des <b>{mot}</b> que l'outil connaît :
+        Tab pour avancer, ↑ ↓ ou Entrée pour changer de ligne, les premières lettres d'une couleur pour y aller, Ctrl + Entrée pour valider. La grille part des <b>{mot}</b> que l'outil connaît :
         saisis les nouveaux totaux du jeu, l'outil ajoute ou retire la différence.
         {breakable && ' La colonne « À briser » n’a pas de sexe : elle alimente la file de la page Brisage.'}
       </p>
@@ -184,7 +245,7 @@ export function InventaireGrid({ espece, onDone }: { espece: Espece; onDone: () 
                     const bad = r?.t !== undefined && num(r.t) !== m(c.name) + f(c.name);
                     return (
                       <tr key={c.name} className={bad ? 'mismatch' : ''}>
-                        <td><Swatch name={c.name} /> {c.name}{bad && <span className="ko" title="Le total ne correspond pas à ♂ + ♀ : saisis un sexe"> ⚠</span>}</td>
+                        <td><Swatch espece={espece} name={c.name} /> {c.name}{bad && <span className="ko" title="Le total ne correspond pas à ♂ + ♀ : saisis un sexe"> ⚠</span>}</td>
                         {cell(c.name, 't', shownTotal(c.name), `${c.name} total`, m(c.name) + f(c.name) !== cur(c.name, 'M') + cur(c.name, 'F') || bad, 0)}
                         {cell(c.name, 'm', String(m(c.name)), `${c.name} ${sym('M')}`, m(c.name) !== cur(c.name, 'M'), 1)}
                         {cell(c.name, 'f', String(f(c.name)), `${c.name} ${sym('F')}`, f(c.name) !== cur(c.name, 'F'), 2)}

@@ -96,7 +96,7 @@ export function StockTable({ filtre, espece }: { filtre: Filtre; espece: Espece 
                   return (
                     <tr key={c.name}>
                       <td>
-                        <Swatch name={c.name} /> {c.name}
+                        <Swatch espece={espece} name={c.name} /> {c.name}
                         {filtre !== 'feconde' && fertAll.length > 1 && (
                           <div><button className="promote" onClick={() => promote(fertAll, `${fertAll.length} ${c.name}`)}>Toutes → féconde ({fertAll.length})</button></div>
                         )}

@@ -45,7 +45,7 @@ export function NowBlock({ T, dd, now }: { T: Color; dd: Monture[]; now: Crossin
           <div className="xlines">
             {now.map((r) => (
               <div className="xline" key={`${r.m}|${r.f}`}>
-                <b>{r.n}×</b> <MountTag c={r.m} x="M" /> × <MountTag c={r.f} x="F" /> → <Swatch name={r.child} size={14} /> <b>{r.child}</b>
+                <b>{r.n}×</b> <MountTag espece="dragodinde" c={r.m} x="M" /> × <MountTag espece="dragodinde" c={r.f} x="F" /> → <Swatch espece="dragodinde" name={r.child} size={14} /> <b>{r.child}</b>
               </div>
             ))}
           </div>
@@ -54,7 +54,7 @@ export function NowBlock({ T, dd, now }: { T: Color; dd: Monture[]; now: Crossin
           {totals.map((t) => (
             <div className="trow" key={t.child}>
               <div className="lead">
-                <b>{t.n}×</b> <span className="neutral" aria-label="sexe indifférent">–</span> <Swatch name={t.child} size={16} /> <b>{t.child}</b> <span className="muted">G{t.gen}</span>
+                <b>{t.n}×</b> <span className="neutral" aria-label="sexe indifférent">–</span> <Swatch espece="dragodinde" name={t.child} size={16} /> <b>{t.child}</b> <span className="muted">G{t.gen}</span>
               </div>
               <div className="slots">
                 {journal.filter((r) => r.child === t.child).map((r) => <JournalChip key={r.t} r={r} />)}
@@ -77,7 +77,7 @@ export function NowBlock({ T, dd, now }: { T: Color; dd: Monture[]; now: Crossin
               <h3 style={{ fontSize: '1.05rem', marginBottom: 6 }}>Sexes à demander (Animakina)</h3>
               {Object.entries(sexes.forced).map(([c, f]) => (
                 <div key={c} className="xline">
-                  <Swatch name={c} size={14} /> <b>{c}</b> : imposer{' '}
+                  <Swatch espece="dragodinde" name={c} size={14} /> <b>{c}</b> : imposer{' '}
                   {f.M > 0 && <span className="sex-M">{f.M} <SexMark x="M" /></span>}{f.M > 0 && f.F > 0 && ' et '}{f.F > 0 && <span className="sex-F">{f.F} <SexMark x="F" /></span>}
                   {' '}sur {sexes.babies[c]} bébé{sexes.babies[c] > 1 ? 's' : ''}
                 </div>
@@ -85,7 +85,7 @@ export function NowBlock({ T, dd, now }: { T: Color; dd: Monture[]; now: Crossin
               <p style={{ margin: '8px 0 4px' }}>
                 Couples formés ensuite :{' '}
                 {Object.entries(sexes.next).map(([c, n], i) => (
-                  <span key={c}>{i ? ', ' : ''}<b>{n.couples}</b> <Swatch name={c} size={12} /> {c}{n.withItems < n.couples ? ` (dont ${n.couples - n.withItems} sans Animakina)` : ''}</span>
+                  <span key={c}>{i ? ', ' : ''}<b>{n.couples}</b> <Swatch espece="dragodinde" name={c} size={12} /> {c}{n.withItems < n.couples ? ` (dont ${n.couples - n.withItems} sans Animakina)` : ''}</span>
                 ))}
               </p>
               <div className="bar" style={{ margin: '6px 0 0', alignItems: 'center' }}>

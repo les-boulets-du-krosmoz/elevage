@@ -59,20 +59,20 @@ export function MiniBar({ m, f, child, onClose, onFlip, onOther }: Props) {
 
   const res = (c: string, x: Sex, win = false) => (
     <button key={c + x} ref={win && x === 'M' ? first : undefined} className={`res ${win ? 'win' : 'alt'}`} onClick={() => pick(c, x)}>
-      <Swatch name={c} size={13} /> {c} <SexMark x={x} />
+      <Swatch espece="dragodinde" name={c} size={13} /> {c} <SexMark x={x} />
     </button>
   );
 
   return (
     <div className="mbar" role="group" aria-label="Résultat de l'accouplement" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
-      <span className="ttl"><MountTag c={m} x="M" size={12} /> × <MountTag c={f} x="F" size={12} /></span>
+      <span className="ttl"><MountTag espece="dragodinde" c={m} x="M" size={12} /> × <MountTag espece="dragodinde" c={f} x="F" size={12} /></span>
       {onFlip && <button className="res alt" onClick={onFlip} title="Inverser les sexes des parents">⇄</button>}
       <button className="x" onClick={onClose} aria-label="Fermer">✕</button>
       {repro && (
         <div className="slots2">
           {[0, 1].map((i) => (
             <button key={i} className={`slot${cur === i ? ' on' : ''}`} onClick={() => setCur(i)}>
-              Bébé {i + 1} : {babies[i] ? <MountTag c={babies[i]!.c} x={babies[i]!.x} size={12} /> : <span className="muted">à choisir</span>}
+              Bébé {i + 1} : {babies[i] ? <MountTag espece="dragodinde" c={babies[i]!.c} x={babies[i]!.x} size={12} /> : <span className="muted">à choisir</span>}
             </button>
           ))}
           <button className="res win" disabled={!babies[0] || !babies[1]} onClick={() => commit(babies as Baby[])}>Valider les 2 bébés</button>
